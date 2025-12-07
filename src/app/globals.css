@@ -1,0 +1,173 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+/* Définition des variables personnalisées Tailwind v4 */
+@theme {
+  --color-primary: #31326f;
+  --color-secondary: #c8f9e4;
+  --color-textPrimary: #020e27;
+  --color-textSecondary: #364259;
+  --color-whiteText: #edeefd;
+  --color-hoverBackground: #f9f9fb;
+  --color-lightBg: #edfdf6;
+  --color-blue: #4754ff;
+  --color-border: #e4e8f1;
+  --font-main: "Be Vietnam Pro", sans-serif;
+}
+
+/* Styles de base appliqués au body */
+@layer base {
+  body {
+    font-family: var(--font-main);
+    color: var(--color-textPrimary);
+  }
+  h1 {
+    font-size: 64px;
+    margin-top: 0;
+    color: var(--color-textPrimary);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.13;
+  }
+  h4 {
+    margin-bottom: 1rem;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--color-textPrimary);
+  }
+  h5 {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: normal;
+    color: var(--color-textPrimary);
+  }
+  h6 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+  }
+  p {
+    font-size: 1rem;
+    margin: 0.5rem 0;
+    line-height: 2rem;
+    letter-spacing: -0.02em;
+    color: var(--color-textSecondary);
+  }
+  input {
+    padding-left: 14px;
+    font-weight: 500;
+    width: 100%;
+    min-height: 56px;
+    border: 1px solid var(--color-border);
+    color: var(--color-textPrimary);
+    font-size: 0.875rem;
+    line-height: 1.1;
+    margin-bottom: 0;
+  }
+  input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+}
+
+/* Buttons */
+.primary-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.875rem;
+  color: #fff;
+  background-color: var(--color-primary);
+  transition: all 0.3s ease-in;
+}
+.primary-button:hover {
+  background-color: var(--color-blue);
+}
+.secondary-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid var(--color-textPrimary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-textPrimary);
+  padding: 0.5rem 1.5rem;
+  transition: all 0.3s ease-in;
+}
+.secondary-button:hover {
+  background-color: var(--color-textPrimary);
+  color: #fff;
+}
+
+/* Links */
+.navlink {
+  position: relative;
+  font-weight: 500;
+  text-align: left;
+  transition: all 0.3s;
+  color: var(--color-textPrimary);
+  font-size: 0.875rem;
+  vertical-align: top;
+  margin: 0 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+/* Small headings */
+.heading-detail {
+  margin-bottom: 14px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-blue);
+  letter-spacing: 0.05em;
+  line-height: 2rem;
+}
+.heading-detail-small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-textPrimary);
+  letter-spacing: 0.06em;
+  line-height: 1rem;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadeInDown {
+  animation: fadeInDown 0.8s ease-out forwards;
+}
+.animate-fadeInUp {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+.animate-delay-200 {
+  animation-delay: 0.2s;
+}
+.animate-delay-400 {
+  animation-delay: 0.4s;
+}

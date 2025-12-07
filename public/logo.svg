@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80" viewBox="0 0 750 200" role="img" aria-label="Medcare logo small">
+  <defs>
+    <style>
+      .heart-stroke { stroke: #12d196; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .ecg-stroke { stroke: #12d196; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .word { font-family: "Helvetica Neue", Arial, sans-serif; font-weight: 700; font-size: 88px; fill: #0b2940; }
+    </style>
+  </defs>
+
+  <!-- Icône cœur -->
+  <g transform="translate(40,12)">
+    <path class="heart-stroke" d="
+      M100 40
+      C100 15 130 2 155 18
+      C175 30 175 60 155 80
+      L123 115
+      L100 135
+      L77 115
+      L45 80
+      C25 60 25 30 45 18
+      C70 2 100 15 100 40
+      Z" />
+    <path class="ecg-stroke" d="
+      M46 80
+      L70 80
+      L80 58
+      L94 98
+      L112 78
+      L130 78" />
+  </g>
+
+  <!-- Texte "Medcare" -->
+  <text class="word" x="250" y="130">MedCare</text>
+</svg>
