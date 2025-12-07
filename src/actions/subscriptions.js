@@ -7,7 +7,7 @@ import { updateClinicSchema } from "@/lib/validation";
 export const SUBSCRIPTION_DURATION_MONTHS = {
   FREE: 1,
   PRO: 3,
-  ENTERPRISE: 12,
+  ENTERPRISE: 6,
 };
 
 export function addMonths(date, months) {

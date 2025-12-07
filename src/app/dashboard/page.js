@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import AdminCard from "@/components/dashboard/AdminCard";
-import Card from "@/components/dashboard/Card";
+import Statistics from "@/components/dashboard/Statistics";
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
@@ -21,7 +21,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 space-y-5">
-      <Card />
+      <Statistics />
 
       <AdminCard user={user} />
     </div>

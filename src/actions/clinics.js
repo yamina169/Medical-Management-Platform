@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { getClinicsQuerySchema, updateClinicSchema } from "@/lib/validation";
+import { updateClinicSchema } from "@/lib/validation";
 
 /** helper pour formatter les erreurs Zod */
 function formatZodError(err) {
@@ -9,70 +9,74 @@ function formatZodError(err) {
     .join("; ");
 }
 
-/**
- * Récupérer toutes les cliniques avec pagination, tri et recherche
- * Inclut l'email du premier admin actif
- */
-export async function getClinics({
-  page = 1,
-  limit = 10,
-  search = "",
-  sort = "createdAt:desc",
-} = {}) {
-  const parsed = getClinicsQuerySchema.parse({ page, limit, search, sort });
-  const take = parsed.limit;
-  const skip = (parsed.page - 1) * take;
+/* ===========================================================
+    1.   STATS GLOBALES (SUPERADMIN DASHBOARD)
+   =========================================================== */
 
-  const where = parsed.search
-    ? {
-        OR: [
-          { name: { contains: parsed.search, mode: "insensitive" } },
-          { taxId: { contains: parsed.search, mode: "insensitive" } },
-        ],
-      }
-    : {};
+/** Static prices for each subscription type */
+const SUBSCRIPTION_PRICES = {
+  FREE: 0,
+  PRO: 150,
+  ENTERPRISE: 280,
+};
 
-  const total = await prisma.clinic.count({ where });
+export async function getClinicsStats() {
+  // Active clinics
+  const activeClinics = await prisma.clinic.count({
+    where: { isActive: true },
+  });
 
-  const clinics = await prisma.clinic.findMany({
-    where,
-    skip,
-    take,
-    orderBy: {
-      [parsed.sort.split(":")[0]]:
-        parsed.sort.split(":")[1] === "asc" ? "asc" : "desc",
-    },
-    include: {
-      admins: {
-        where: { isActive: true }, // <-- seulement admins actifs
-        select: {
-          user: { select: { email: true } }, // récupérer email
-        },
-      },
+  // Active subscriptions (PRO and ENTERPRISE)
+  const activeSubscriptions = await prisma.clinic.count({
+    where: {
+      subscriptionType: { in: ["PRO", "ENTERPRISE"] },
+      subscriptionStatus: "ACTIVE",
     },
   });
 
-  const dataWithAdminEmail = clinics.map((clinic) => ({
-    ...clinic,
-    adminEmail: clinic.admins[0]?.user?.email || "N/A",
-    admins: undefined, // optionnel : supprimer la liste complète
-  }));
+  // Fetch all PRO/ENTERPRISE subscriptions (any status)
+  const subscriptions = await prisma.clinic.findMany({
+    where: {
+      subscriptionType: { in: ["PRO", "ENTERPRISE"] },
+      subscriptionStart: { not: null },
+    },
+    select: {
+      subscriptionType: true,
+      subscriptionStart: true,
+      subscriptionEnd: true,
+    },
+  });
+
+  // Calculate revenue per month (only in the start month)
+  const revenueMap = {}; // { "2025-01": 450, "2025-02": 300, ... }
+
+  subscriptions.forEach((sub) => {
+    const price = SUBSCRIPTION_PRICES[sub.subscriptionType] || 0;
+    if (!sub.subscriptionStart) return;
+
+    const start = new Date(sub.subscriptionStart);
+    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}`;
+    revenueMap[key] = (revenueMap[key] || 0) + price;
+  });
+
+  // Convert revenueMap to an array sorted by month
+  const monthlyRevenue = Object.keys(revenueMap)
+    .sort()
+    .map((month) => ({ month, revenue: revenueMap[month] }));
 
   return {
-    meta: {
-      total,
-      page: parsed.page,
-      limit: take,
-      pages: Math.max(Math.ceil(total / take), 1),
-    },
-    data: dataWithAdminEmail,
+    activeClinics,
+    activeSubscriptions,
+    monthlyRevenue,
   };
 }
 
-/**
- * Récupérer les cliniques filtrées pour CLINIC_ADMIN ou liste publique
- * Inclut email du premier admin actif
- */
+/* ===========================================================
+    2.   LISTE FILTRÉE DES CLINIQUES (SUPERADMIN PAGE)
+   =========================================================== */
 export async function getFilteredClinics({
   page = 1,
   limit = 10,
@@ -128,9 +132,9 @@ export async function getFilteredClinics({
   };
 }
 
-/**
- * Récupérer une clinique par ID
- */
+/* ===========================================================
+    3.   GET CLINIC BY ID
+   =========================================================== */
 export async function getClinicById(id) {
   if (!id) throw new Error("Clinic id is required");
 
@@ -188,17 +192,17 @@ export async function getClinicById(id) {
   };
 }
 
+/* ===========================================================
+    4.   UPDATE CLINIC
+   =========================================================== */
 export async function updateClinic(id, data) {
   if (!id) throw new Error("clinic id is required");
 
-  // Validation et update...
   const parsed = updateClinicSchema.parse(data);
   const payload = { ...parsed, updatedAt: new Date() };
 
-  const updated = await prisma.clinic.update({
+  return await prisma.clinic.update({
     where: { id: Number(id) },
     data: payload,
   });
-
-  return updated;
 }

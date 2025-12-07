@@ -110,175 +110,167 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="w-full flex justify-between items-center bg-white shadow px-6 py-2 relative">
-      {/* Logo */}
-      <div className="flex items-center gap-3">
-        <img src="/logo.svg" alt="Logo" className="h-10 w-auto" />
-      </div>
+    <>
+      <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center bg-white/80 backdrop-blur-md shadow px-6 py-2">
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo.svg"
+            alt="Logo"
+            className="h-15 w-auto" // augmenté de h-10 → h-12
+          />
+        </div>
 
-      {/* Right: Notifications + Profile */}
-      <div className="flex items-center gap-4 relative" ref={dropdownRef}>
-        {/* Notification button */}
-        {/* Notification button */}
-        <button
-          aria-label="Notifications"
-          className="relative p-2 rounded-full hover:bg-gray-100 transition"
-          onClick={async () => {
-            setMenuOpen(!menuOpen);
-            await fetchNotifications();
-            // Supprimer le badge rouge dès que l'utilisateur clique
-            setNotifications((prev) => ({
-              ...prev,
-              expired: prev.expired,
-              expiring: prev.expiring,
-              pendingAdmins: prev.pendingAdmins,
-            }));
-            // On peut utiliser un état séparé pour le badge
-            setBadgeVisible(false);
-          }}
-        >
-          <BellIcon className="h-5 w-5 text-gray-600" />
-          {totalNotifications > 0 && badgeVisible && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-              {totalNotifications}
-            </span>
-          )}
-        </button>
-
-        {/* Notifications dropdown */}
-        {menuOpen && (
-          <div className="absolute top-full right-0 mt-2 w-80 max-w-[85vw] bg-white shadow-lg rounded-md overflow-hidden z-50">
-            <div className="px-3 py-2 border-b flex items-center justify-between">
-              <span className="font-semibold text-gray-700">Notifications</span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="text-sm text-blue-600 hover:underline"
-                  onClick={fetchNotifications}
-                >
-                  Refresh
-                </button>
-                <button
-                  className="text-gray-400 hover:text-gray-600 font-bold"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="max-h-64 overflow-auto">
-              {/* Expiring */}
-              <div className="px-3 py-2">
-                <h4 className="text-sm font-medium text-yellow-700 mb-2">
-                  Bientôt expirées
-                </h4>
-                {notifications.expiring.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Aucune clinique bientôt expirée.
-                  </p>
-                ) : (
-                  notifications.expiring.map((c) => (
-                    <div
-                      key={`e-${c.id}`}
-                      className="mb-1 last:mb-0 p-2 rounded hover:bg-yellow-50 transition flex justify-between items-start gap-2"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-800">
-                          {c.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Expire le {formatDate(c.subscriptionEnd)}
-                        </div>
-                      </div>
-                      <span className="text-xs text-yellow-700 font-semibold">
-                        À venir
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <hr className="border-gray-200" />
-
-              {/* Expired */}
-              <div className="px-3 py-2">
-                <h4 className="text-sm font-medium text-red-700 mb-2">
-                  Expirées
-                </h4>
-                {notifications.expired.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    Aucune clinique expirée.
-                  </p>
-                ) : (
-                  notifications.expired.map((c) => (
-                    <div
-                      key={`x-${c.id}`}
-                      className="mb-1 last:mb-0 p-2 rounded hover:bg-red-50 transition flex justify-between items-start gap-2"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-800">
-                          {c.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Expiré le {formatDate(c.subscriptionEnd)}
-                        </div>
-                      </div>
-                      <span className="text-xs text-red-700 font-semibold">
-                        Expiré
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <hr className="border-gray-200" />
-
-              {/* Pending admins */}
-              <div className="px-3 py-2">
-                <h4 className="text-sm font-medium text-blue-700 mb-2">
-                  Nouveaux comptes non activés
-                </h4>
-                {notifications.pendingAdmins.length === 0 ? (
-                  <p className="text-sm text-gray-500">Aucun nouveau compte.</p>
-                ) : (
-                  notifications.pendingAdmins.map((c) => (
-                    <div
-                      key={`p-${c.id}`}
-                      className="mb-1 last:mb-0 p-2 rounded hover:bg-blue-50 transition flex justify-between items-start gap-2"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-800">
-                          {c.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {c.adminClinic?.createdAt
-                            ? `Créé le ${formatDate(c.adminClinic.createdAt)}`
-                            : `Email: ${c.email}`}
-                        </div>
-                      </div>
-                      <span className="text-xs text-blue-700 font-semibold">
-                        En attente
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Profile button */}
-        <div className="relative">
+        {/* Right: Notifications + Profile */}
+        <div className="flex items-center gap-4 relative" ref={dropdownRef}>
+          {/* Notification button */}
           <button
-            className={`flex items-center justify-center w-9 h-9 rounded-full text-white font-semibold ${bgColor} hover:brightness-110 transition`}
-            onClick={() => {
-              window.location.href = "/dashboard/profil";
+            aria-label="Notifications"
+            className="relative p-2 rounded-full hover:bg-gray-100 transition"
+            onClick={async () => {
+              toggleNotifications();
+              setBadgeVisible(false);
             }}
           >
-            {userInitial}
+            <BellIcon className="h-5 w-5 text-gray-600" />
+            {totalNotifications > 0 && badgeVisible && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {totalNotifications}
+              </span>
+            )}
           </button>
+
+          {/* Notifications dropdown */}
+          {/* Notifications dropdown - modern look */}
+          {menuOpen && (
+            <div className="absolute top-full right-0 mt-2 w-80 max-w-[85vw] bg-white/90 backdrop-blur-md shadow-xl rounded-2xl overflow-hidden z-50 border border-gray-200">
+              {/* Header */}
+              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200">
+                <span className="font-semibold text-gray-700 text-sm">
+                  Notifications
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="text-gray-400 hover:text-gray-600 font-bold transition"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenu notifications */}
+              <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                {/* Bientôt expirées */}
+                {notifications.expiring.length > 0 && (
+                  <div className="px-4 py-3">
+                    <h4 className="text-xs font-semibold text-yellow-700 uppercase mb-2">
+                      Bientôt expirées
+                    </h4>
+                    {notifications.expiring.map((c) => (
+                      <div
+                        key={`e-${c.id}`}
+                        className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-yellow-50 transition flex justify-between items-start gap-2 cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            {c.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Expire le {formatDate(c.subscriptionEnd)}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-yellow-700">
+                          À venir
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expirées */}
+                {notifications.expired.length > 0 && (
+                  <div className="px-4 py-3">
+                    <h4 className="text-xs font-semibold text-red-600 uppercase mb-2">
+                      Expirées
+                    </h4>
+                    {notifications.expired.map((c) => (
+                      <div
+                        key={`x-${c.id}`}
+                        className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-red-50 transition flex justify-between items-start gap-2 cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            {c.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Expiré le {formatDate(c.subscriptionEnd)}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-red-600">
+                          Expiré
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Nouveaux comptes non activés */}
+                {notifications.pendingAdmins.length > 0 && (
+                  <div className="px-4 py-3">
+                    <h4 className="text-xs font-semibold text-blue-700 uppercase mb-2">
+                      Nouveaux comptes non activés
+                    </h4>
+                    {notifications.pendingAdmins.map((c) => (
+                      <div
+                        key={`p-${c.id}`}
+                        className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-blue-50 transition flex justify-between items-start gap-2 cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            {c.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {c.adminClinic?.createdAt
+                              ? `Créé le ${formatDate(c.adminClinic.createdAt)}`
+                              : `Email: ${c.email}`}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-blue-700">
+                          En attente
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Profile button */}
+          {/* Profile button */}
+          <div className="relative flex items-center gap-2">
+            <button
+              className={`flex items-center justify-center w-9 h-9 rounded-full text-white font-semibold ${bgColor} hover:brightness-110 transition`}
+              onClick={() => {
+                window.location.href = "/dashboard/profil";
+              }}
+            >
+              {userInitial}
+            </button>
+
+            {/* Afficher le nom complet */}
+            {user?.name && (
+              <span className="text-gray-700 font-medium text-sm hidden md:inline">
+                {user.name}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Padding pour ne pas cacher le contenu derrière la navbar */}
+      <div className="pt-16"></div>
+    </>
   );
 }

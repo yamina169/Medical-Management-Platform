@@ -4,6 +4,7 @@ import {
   getFilteredClinics,
   getClinicById,
   updateClinic,
+  getClinicsStats,
 } from "@/actions/clinics";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -32,15 +33,33 @@ export async function GET(req) {
 
     const url = new URL(req.url);
     const params = url.searchParams;
-    const id = params.get("id");
 
-    // GET d'une seule clinique par ID
+    const id = params.get("id");
+    const stats = params.get("stats");
+
+    /* ============================
+       1️⃣ GET STATS SUPERADMIN
+       ============================ */
+    if (stats === "true") {
+      if (user.role !== "SUPERADMIN") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const data = await getClinicsStats();
+      return NextResponse.json(data, { status: 200 });
+    }
+
+    /* ============================
+       2️⃣ GET CLINIC BY ID
+       ============================ */
     if (id) {
       const clinic = await getClinicById(Number(id));
       return NextResponse.json(clinic, { status: 200 });
     }
 
-    // GET liste des cliniques : seulement SUPERADMIN
+    /* ============================
+       3️⃣ GET FILTERED CLINICS (LIST)
+       ============================ */
     if (user.role !== "SUPERADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -78,9 +97,9 @@ export async function PUT(req) {
       );
     }
 
-    // Mettre à jour seulement si l'admin appartient à la clinique
+    // Vérifier que l'admin appartient à la clinique
     const clinic = await getClinicById(Number(id));
-    const isAdminOfClinic = clinic.clinic.adminEmail; // backend renvoie seulement l'email actif
+    const isAdminOfClinic = clinic.clinic.adminEmail;
 
     if (!isAdminOfClinic) {
       return NextResponse.json(
@@ -89,7 +108,7 @@ export async function PUT(req) {
       );
     }
 
-    // Champs autorisés pour la mise à jour
+    // Champs autorisés
     const allowedFields = [
       "name",
       "taxId",
