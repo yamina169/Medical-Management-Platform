@@ -1,27 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// === Utilisateur central pour l'authentification ===
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  role      RoleEnum
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  superAdmin   SuperAdmin?
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  password     String
+  role         RoleEnum
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   adminClinic  AdminClinic?
   doctor       Doctor?
-  receptionist Receptionist?
   patient      Patient?
+  receptionist Receptionist?
+  superAdmin   SuperAdmin?
+}
+
+model SuperAdmin {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Clinic {
+  id                 Int                @id @default(autoincrement())
+  name               String             @unique
+  address            String?
+  phone              String?
+  subscriptionEnd    DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  subscriptionStart  DateTime?
+  subscriptionType   SubscriptionType   @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  taxId              String             @unique
+  isActive           Boolean            @default(false)
+  admins             AdminClinic[]
+  appointments       Appointment[]
+  doctors            Doctor[]
+  invoices           Invoice[]
+  patients           Patient[]
+  receptionists      Receptionist[]
+}
+
+model AdminClinic {
+  id        Int      @id @default(autoincrement())
+  clinicId  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  isActive  Boolean  @default(false)
+  userId    Int      @unique
+  clinic    Clinic?  @relation(fields: [clinicId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Specialization {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctors   Doctor[]
+}
+
+model Receptionist {
+  id           Int           @id @default(autoincrement())
+  userId       Int           @unique
+  clinicId     Int
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now())
+  doctorId     Int?          @unique
+  appointments Appointment[] @relation("ReceptionistAppointments")
+  patients     Patient[]     @relation("ReceptionistPatients")
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  doctor       Doctor?       @relation("DoctorReceptionist", fields: [doctorId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+}
+
+model Doctor {
+  id               Int             @id @default(autoincrement())
+  userId           Int             @unique
+  clinicId         Int
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now())
+  specializationId Int?
+  appointments     Appointment[]   @relation("DoctorAppointments")
+  clinic           Clinic          @relation(fields: [clinicId], references: [id])
+  specialization   Specialization? @relation(fields: [specializationId], references: [id])
+  user             User            @relation(fields: [userId], references: [id])
+  medicalRecords   MedicalRecord[]
+  patients         Patient[]       @relation("DoctorPatients")
+  receptionist     Receptionist?   @relation("DoctorReceptionist")
+}
+
+model Patient {
+  id             Int             @id @default(autoincrement())
+  registeredBy   Int?
+  clinicId       Int
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now())
+  userId         Int             @unique
+  doctorId       Int?
+  receptionistId Int?
+  appointments   Appointment[]
+  invoices       Invoice[]
+  medicalRecords MedicalRecord[]
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  doctor         Doctor?         @relation("DoctorPatients", fields: [doctorId], references: [id])
+  receptionist   Receptionist?   @relation("ReceptionistPatients", fields: [receptionistId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+}
+
+model Appointment {
+  id             Int               @id @default(autoincrement())
+  patientId      Int
+  doctorId       Int
+  receptionistId Int
+  clinicId       Int
+  date           DateTime
+  status         AppointmentStatus
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now())
+  clinic         Clinic            @relation(fields: [clinicId], references: [id])
+  doctor         Doctor            @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  receptionist   Receptionist      @relation("ReceptionistAppointments", fields: [receptionistId], references: [id])
+}
+
+model MedicalRecord {
+  id            Int      @id @default(autoincrement())
+  patientId     Int
+  doctorId      Int
+  description   String
+  prescriptions Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+  doctor        Doctor   @relation(fields: [doctorId], references: [id])
+  patient       Patient  @relation(fields: [patientId], references: [id])
+}
+
+model Invoice {
+  id            Int           @id @default(autoincrement())
+  patientId     Int
+  clinicId      Int
+  amount        Float
+  status        InvoiceStatus
+  paymentMethod String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now())
+  clinic        Clinic        @relation(fields: [clinicId], references: [id])
+  patient       Patient       @relation(fields: [patientId], references: [id])
 }
 
 enum RoleEnum {
@@ -32,16 +168,6 @@ enum RoleEnum {
   PATIENT
 }
 
-// === SuperAdmin ===
-model SuperAdmin {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// === Clinic ===
 enum SubscriptionType {
   FREE
   PRO
@@ -54,140 +180,7 @@ enum SubscriptionStatus {
   EXPIRED
   TRIAL
 }
-model Clinic {
-  id                 Int               @id @default(autoincrement())
-  name               String            @unique
-  taxId              String            @unique  // <- rendre unique
-  address            String?
-  phone              String?
-  subscriptionType   SubscriptionType  @default(FREE)
-  subscriptionStatus SubscriptionStatus @default(TRIAL)
-  subscriptionStart  DateTime?
-  subscriptionEnd    DateTime?
-  isActive           Boolean           @default(false)  // <-- nouveau champ
 
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-
-  admins        AdminClinic[]
-  doctors       Doctor[]
-  receptionists Receptionist[]
-  patients      Patient[]
-  appointments  Appointment[]
-  invoices      Invoice[]
-}
-
-
-// === AdminClinic ===
-model AdminClinic {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id])
-  clinicId  Int?
-  clinic    Clinic?  @relation(fields: [clinicId], references: [id])
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-}
-
-// === Doctor ===
-model Doctor {
-  id             Int     @id @default(autoincrement())
-  userId         Int     @unique
-  user           User    @relation(fields: [userId], references: [id])
-  clinicId       Int
-  clinic         Clinic  @relation(fields: [clinicId], references: [id])
-  specialization String?
-  isActive       Boolean @default(true)
-
-  appointments   Appointment[]   @relation("DoctorAppointments")
-  medicalRecords MedicalRecord[]
-  patients       Patient[]       @relation("DoctorPatients") // correspond à Patient.doctor
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @default(now())
-}
-
-model Receptionist {
-  id       Int     @id @default(autoincrement())
-  userId   Int     @unique
-  user     User    @relation(fields: [userId], references: [id])
-  clinicId Int
-  clinic   Clinic  @relation(fields: [clinicId], references: [id])
-  isActive Boolean @default(true)
-
-  appointments Appointment[] @relation("ReceptionistAppointments")
-  patients     Patient[]     @relation("ReceptionistPatients") // correspond à Patient.receptionist
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @default(now())
-}
-
-// === Patient ===
-model Patient {
-  id             Int    @id @default(autoincrement())
-  userId         Int    @unique
-  user           User   @relation(fields: [userId], references: [id])
-  registeredBy   Int?
-  doctorId       Int?
-  receptionistId Int?
-  clinicId       Int
-  clinic         Clinic @relation(fields: [clinicId], references: [id])
-
-  // Relation vers Doctor et Receptionist
-  doctor       Doctor?       @relation("DoctorPatients", fields: [doctorId], references: [id])
-  receptionist Receptionist? @relation("ReceptionistPatients", fields: [receptionistId], references: [id])
-
-  appointments   Appointment[]
-  medicalRecords MedicalRecord[]
-  invoices       Invoice[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @default(now())
-}
-
-// === Appointment ===
-model Appointment {
-  id             Int               @id @default(autoincrement())
-  patientId      Int
-  doctorId       Int
-  receptionistId Int
-  clinicId       Int
-  date           DateTime
-  status         AppointmentStatus
-  patient        Patient           @relation(fields: [patientId], references: [id])
-  doctor         Doctor            @relation("DoctorAppointments", fields: [doctorId], references: [id])
-  receptionist   Receptionist      @relation("ReceptionistAppointments", fields: [receptionistId], references: [id])
-  clinic         Clinic            @relation(fields: [clinicId], references: [id])
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @default(now())
-}
-
-// === MedicalRecord ===
-model MedicalRecord {
-  id            Int      @id @default(autoincrement())
-  patientId     Int
-  doctorId      Int
-  description   String
-  prescriptions Json?
-  patient       Patient  @relation(fields: [patientId], references: [id])
-  doctor        Doctor   @relation(fields: [doctorId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now())
-}
-
-// === Invoice ===
-model Invoice {
-  id            Int           @id @default(autoincrement())
-  patientId     Int
-  clinicId      Int
-  amount        Float
-  status        InvoiceStatus
-  paymentMethod String?
-  patient       Patient       @relation(fields: [patientId], references: [id])
-  clinic        Clinic        @relation(fields: [clinicId], references: [id])
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now())
-}
-
-// === Enums ===
 enum AppointmentStatus {
   SCHEDULED
   CANCELLED

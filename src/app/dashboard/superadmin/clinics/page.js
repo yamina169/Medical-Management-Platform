@@ -46,6 +46,8 @@ export default function ClinicsPage() {
   useEffect(() => {
     fetchClinics(pagination.page);
   }, [pagination.page, search]);
+  const [clinicCounts, setClinicCounts] = useState(null);
+  const [clinicTotals, setClinicTotals] = useState(null);
 
   const openModal = async (id) => {
     if (!token) return;
@@ -55,7 +57,11 @@ export default function ClinicsPage() {
       });
       const json = await res.json();
       if (!json?.clinic) return;
-      setSelectedClinic(json);
+
+      // On stocke séparément clinic, counts et totals
+      setSelectedClinic(json.clinic);
+      setClinicCounts(json.counts);
+      setClinicTotals(json.totals);
       setModalOpen(true);
     } catch (err) {
       console.error(err);
@@ -175,43 +181,40 @@ export default function ClinicsPage() {
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <Dialog.Panel className="w-full max-w-md bg-white rounded shadow-lg p-6">
               <Dialog.Title className="text-lg font-medium mb-4">
-                {selectedClinic.clinic.name}
+                {selectedClinic.name}
               </Dialog.Title>
 
               <div className="space-y-2 text-sm">
                 <p>
                   <strong>Admin Email:</strong>{" "}
-                  {selectedClinic.clinic.adminEmail || "N/A"}
+                  {selectedClinic.adminEmail || "N/A"}
                 </p>
                 <p>
-                  <strong>Phone:</strong> {selectedClinic.clinic.phone || "-"}
+                  <strong>Phone:</strong> {selectedClinic.phone || "-"}
                 </p>
                 <p>
-                  <strong>Address:</strong>{" "}
-                  {selectedClinic.clinic.address || "-"}
+                  <strong>Address:</strong> {selectedClinic.address || "-"}
                 </p>
                 <p>
-                  <strong>Tax ID:</strong> {selectedClinic.clinic.taxId}
+                  <strong>Tax ID:</strong> {selectedClinic.taxId}
                 </p>
                 <p>
                   <strong>Subscription:</strong>{" "}
-                  {selectedClinic.clinic.subscriptionType}
+                  {selectedClinic.subscriptionType}
                 </p>
                 <p>
                   <strong>Total Invoices Amount:</strong>{" "}
-                  {selectedClinic.totals?.invoicesAmount || 0}
+                  {clinicTotals?.invoicesAmount || 0}
                 </p>
                 <p>
-                  <strong>Staff Count:</strong>{" "}
-                  {selectedClinic.counts?.staff || 0}
+                  <strong>Staff Count:</strong> {clinicCounts?.staff || 0}
                 </p>
                 <p>
                   <strong>Appointments:</strong>{" "}
-                  {selectedClinic.counts?.appointments || 0}
+                  {clinicCounts?.appointments || 0}
                 </p>
                 <p>
-                  <strong>Patients:</strong>{" "}
-                  {selectedClinic.counts?.patients || 0}
+                  <strong>Patients:</strong> {clinicCounts?.patients || 0}
                 </p>
               </div>
 
