@@ -2,48 +2,48 @@ import prisma from "@/lib/prisma";
 import {
   activateSubscription,
   autoUpdateSubscriptions,
+  getFilteredSubscriptions,
 } from "@/actions/subscriptions";
 import jwt from "jsonwebtoken"; // ou la lib que tu utilises pour JWT
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export async function GET(req, res) {
+export async function GET(req) {
   try {
-    // Récupérer le token depuis les headers
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer "))
       return new Response("Unauthorized", { status: 401 });
-    }
+
     const token = authHeader.split(" ")[1];
 
-    // Vérifier le token
     let user;
     try {
       user = jwt.verify(token, JWT_SECRET);
-    } catch (err) {
+    } catch {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    if (user.role !== "SUPERADMIN") {
+    if (user.role !== "SUPERADMIN")
       return new Response("Forbidden", { status: 403 });
-    }
 
     const url = new URL(req.url);
+
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
-    const skip = (page - 1) * limit;
+
+    const search = url.searchParams.get("search") || "";
+    const type = url.searchParams.get("type") || "";
+    const status = url.searchParams.get("status") || "";
 
     await autoUpdateSubscriptions();
 
-    const [clinics, total] = await Promise.all([
-      prisma.clinic.findMany({
-        include: { admins: { include: { user: true } } },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.clinic.count(),
-    ]);
+    const { clinics, total } = await getFilteredSubscriptions({
+      page,
+      limit,
+      search,
+      type,
+      status,
+    });
 
     return new Response(
       JSON.stringify({

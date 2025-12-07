@@ -195,3 +195,40 @@ export async function activateSubscription(clinicId) {
 
   return updated;
 }
+// 🔍 Filtrer les abonnements
+export async function getFilteredSubscriptions({
+  page = 1,
+  limit = 10,
+  search = "",
+  type = "",
+  status = "",
+}) {
+  const skip = (page - 1) * limit;
+
+  const where = {};
+
+  if (search) {
+    where.name = { contains: search, mode: "insensitive" };
+  }
+
+  if (type) {
+    where.subscriptionType = type;
+  }
+
+  if (status) {
+    where.subscriptionStatus = status;
+  }
+
+  const [clinics, total] = await Promise.all([
+    prisma.clinic.findMany({
+      where,
+      include: { admins: { include: { user: true } } },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.clinic.count({ where }),
+  ]);
+
+  return { clinics, total };
+}

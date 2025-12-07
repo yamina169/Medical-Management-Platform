@@ -153,6 +153,7 @@ export const updateClinicSchema = z
     address: z.string().optional(),
     phone: z.string().optional(),
     subscriptionType: subscriptionTypeEnum.optional(),
+    isActive: z.boolean().optional(), // <-- ajouté
     subscriptionStatus: subscriptionStatusEnum.optional(),
     subscriptionStart: z.preprocess((v) => {
       if (v == null) return undefined;

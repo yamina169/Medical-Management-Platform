@@ -6,37 +6,38 @@ import { Dialog } from "@headlessui/react";
 export default function ClinicsPage() {
   const [clinics, setClinics] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, pages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedClinic, setSelectedClinic] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
-  // Récupère le token depuis localStorage
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const fetchClinics = async (page = 1) => {
+    if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/clinics?page=${page}&limit=10`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+      });
+      if (search) params.set("search", search);
+
+      const res = await fetch(`/api/clinics?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-
-      if (!json || !json.meta) {
-        console.error("Invalid response from API", json);
-        return;
-      }
+      if (!json?.data) return;
 
       setClinics(json.data);
       setPagination({
-        page: json.meta.page,
-        pages: json.meta.pages,
-        total: json.meta.total,
+        page: json.meta?.page || 1,
+        pages: json.meta?.pages || 1,
+        total: json.meta?.total || 0,
       });
     } catch (err) {
-      console.error("Error fetching clinics:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -44,21 +45,20 @@ export default function ClinicsPage() {
 
   useEffect(() => {
     fetchClinics(pagination.page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page]);
+  }, [pagination.page, search]);
 
   const openModal = async (id) => {
+    if (!token) return;
     try {
       const res = await fetch(`/api/clinics?id=${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
+      if (!json?.clinic) return;
       setSelectedClinic(json);
       setModalOpen(true);
     } catch (err) {
-      console.error("Error fetching clinic details:", err);
+      console.error(err);
     }
   };
 
@@ -72,47 +72,63 @@ export default function ClinicsPage() {
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-textPrimary mb-6">Clinics</h1>
 
+      <div className="mb-4 flex gap-2">
+        <input
+          type="text"
+          placeholder="Search by name or taxId..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
+          className="px-3 py-2 border rounded-lg w-full max-w-sm text-sm"
+        />
+      </div>
+
       {loading ? (
-        <div>Loading...</div>
+        <div className="text-center py-10 text-textSecondary">Loading...</div>
       ) : (
-        <div className="overflow-x-auto bg-white shadow-md rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto bg-white shadow-md rounded-lg max-w-5xl mx-auto">
+          <table className="min-w-max w-[900px] mx-auto divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">
-                  Address
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-textSecondary uppercase tracking-wider">
-                  Actions
-                </th>
+                {[
+                  "Name",
+                  "Phone",
+                  "Address",
+                  "Admin Email",
+                  "Subscription Status",
+                  "Actions",
+                ].map((th) => (
+                  <th
+                    key={th}
+                    className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider"
+                  >
+                    {th}
+                  </th>
+                ))}
               </tr>
             </thead>
+
             <tbody className="bg-white divide-y divide-gray-200">
               {clinics.map((clinic) => (
-                <tr key={clinic.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{clinic.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {clinic.phone}
+                <tr key={clinic.id} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-3 text-sm">{clinic.name}</td>
+                  <td className="px-4 py-3 text-sm">{clinic.phone || "-"}</td>
+                  <td className="px-4 py-3 text-sm">{clinic.address || "-"}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {clinic.adminEmail || "N/A"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {clinic.address}
+                  <td className="px-4 py-3 text-sm">
+                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded">
+                      {clinic.subscriptionStatus || "N/A"}
+                    </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {clinic.subscriptionStatus || "N/A"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
+
+                  <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => openModal(clinic.id)}
-                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
                     >
                       View
                     </button>
@@ -123,7 +139,7 @@ export default function ClinicsPage() {
           </table>
 
           {/* Pagination */}
-          <div className="flex justify-between items-center mt-4">
+          <div className="flex justify-between items-center mt-4 px-4 pb-4">
             <button
               onClick={() => changePage(pagination.page - 1)}
               disabled={pagination.page <= 1}
@@ -131,9 +147,11 @@ export default function ClinicsPage() {
             >
               Previous
             </button>
-            <span>
+
+            <span className="text-sm">
               Page {pagination.page} / {pagination.pages}
             </span>
+
             <button
               onClick={() => changePage(pagination.page + 1)}
               disabled={pagination.page >= pagination.pages}
@@ -153,26 +171,31 @@ export default function ClinicsPage() {
           className="relative z-50"
         >
           <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <Dialog.Panel className="w-full max-w-md bg-white rounded shadow-lg p-6">
               <Dialog.Title className="text-lg font-medium mb-4">
                 {selectedClinic.clinic.name}
               </Dialog.Title>
 
-              <div className="space-y-2">
+              <div className="space-y-2 text-sm">
                 <p>
-                  <strong>Phone:</strong> {selectedClinic.clinic.phone}
+                  <strong>Admin Email:</strong>{" "}
+                  {selectedClinic.clinic.adminEmail || "N/A"}
                 </p>
                 <p>
-                  <strong>Address:</strong> {selectedClinic.clinic.address}
+                  <strong>Phone:</strong> {selectedClinic.clinic.phone || "-"}
+                </p>
+                <p>
+                  <strong>Address:</strong>{" "}
+                  {selectedClinic.clinic.address || "-"}
                 </p>
                 <p>
                   <strong>Tax ID:</strong> {selectedClinic.clinic.taxId}
                 </p>
                 <p>
                   <strong>Subscription:</strong>{" "}
-                  {selectedClinic.clinic.subscriptionType} (
-                  {selectedClinic.clinic.subscriptionStatus})
+                  {selectedClinic.clinic.subscriptionType}
                 </p>
                 <p>
                   <strong>Total Invoices Amount:</strong>{" "}

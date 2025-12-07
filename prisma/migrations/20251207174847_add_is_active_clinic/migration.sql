@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Clinic" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT false;

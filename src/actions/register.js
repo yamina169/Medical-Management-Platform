@@ -12,6 +12,7 @@ const SUBSCRIPTION_DURATION_MONTHS = { FREE: 1, PRO: 3, ENTERPRISE: 12 };
 /**
  * Fonction pour enregistrer un utilisateur selon son rôle
  */
+
 export async function registerUser(rawInput) {
   if (!rawInput || typeof rawInput !== "object") {
     throw new Error("Input missing or invalid");
@@ -55,70 +56,57 @@ export async function registerUser(rawInput) {
     if (role === "ADMIN_CLINIC") {
       let clinic = null;
 
-      if (role === "ADMIN_CLINIC") {
-        let clinic = null;
+      if (clinicData) {
+        // Vérifier unicité du nom
+        const existingClinic = await tx.clinic.findUnique({
+          where: { name: clinicData.name },
+        });
+        if (existingClinic)
+          throw new Error("Clinic with this name already exists");
 
-        if (clinicData) {
-          // Vérifier unicité du nom
-          const existingClinic = await tx.clinic.findUnique({
-            where: { name: clinicData.name },
-          });
-          if (existingClinic)
-            throw new Error("Clinic with this name already exists");
+        // Vérifier unicité du taxId
+        const existingTaxId = await tx.clinic.findUnique({
+          where: { taxId: clinicData.taxId },
+        });
+        if (existingTaxId)
+          throw new Error("Clinic with this taxId already exists");
 
-          // Vérifier unicité du taxId
-          const existingTaxId = await tx.clinic.findUnique({
-            where: { taxId: clinicData.taxId },
-          });
-          if (existingTaxId)
-            throw new Error("Clinic with this taxId already exists");
+        const now = new Date();
+        let subscriptionStart = now;
+        let subscriptionEnd = now;
+        let subscriptionStatus = "ACTIVE";
 
-          const now = new Date();
-          let subscriptionStart = now;
-          let subscriptionEnd = now;
-          let subscriptionStatus = "ACTIVE"; // par défaut TRIAL
-
-          if (clinicData.subscriptionType === "FREE") {
-            subscriptionStatus = "ACTIVE";
-            subscriptionEnd = null; // pas de fin pour FREE
-          } else {
-            // Pour PRO ou ENTERPRISE, calculer fin selon durée du plan
-            const months =
-              SUBSCRIPTION_DURATION_MONTHS[clinicData.subscriptionType] || 0;
-            subscriptionEnd = new Date(now.setMonth(now.getMonth() + months));
-          }
-
-          // Création clinique
-          clinic = await tx.clinic.create({
-            data: {
-              name: clinicData.name,
-              taxId: clinicData.taxId,
-              address: clinicData.address || null,
-              phone: clinicData.phone || null,
-              subscriptionType: clinicData.subscriptionType,
-              subscriptionStart,
-              subscriptionEnd,
-              subscriptionStatus,
-            },
-          });
+        if (clinicData.subscriptionType === "FREE") {
+          subscriptionStatus = "ACTIVE";
+          subscriptionEnd = null;
+        } else {
+          const months =
+            SUBSCRIPTION_DURATION_MONTHS[clinicData.subscriptionType] || 0;
+          subscriptionEnd = new Date(now.setMonth(now.getMonth() + months));
         }
 
-        const adminClinic = await tx.adminClinic.create({
+        // Création clinique avec isActive false par défaut
+        clinic = await tx.clinic.create({
           data: {
-            userId: user.id,
-            clinicId: clinic ? clinic.id : clinicId || null,
-            isActive: false, // reste false jusqu'à activation
+            name: clinicData.name,
+            taxId: clinicData.taxId,
+            address: clinicData.address || null,
+            phone: clinicData.phone || null,
+            subscriptionType: clinicData.subscriptionType,
+            subscriptionStart,
+            subscriptionEnd,
+            isActive: false, // ajouté
+            subscriptionStatus,
           },
         });
-
-        return { user, adminClinic, clinic, generatedPassword };
       }
 
+      // Création adminClinic
       const adminClinic = await tx.adminClinic.create({
         data: {
           userId: user.id,
           clinicId: clinic ? clinic.id : clinicId || null,
-          isActive: false, // reste false jusqu'à activation
+          isActive: false, // false jusqu'à activation
         },
       });
 
@@ -166,7 +154,7 @@ export async function registerUser(rawInput) {
     }
 
     return { user, generatedPassword };
-  }); // fin transaction
+  });
 
   // 7) Envoi email hors transaction
   await sendEmail({
@@ -177,7 +165,3 @@ export async function registerUser(rawInput) {
 
   return { message: "Création réussie", ...result };
 }
-
-/**
- * Activer un compte AdminClinic par un SuperAdmin
- */

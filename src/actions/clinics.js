@@ -1,8 +1,7 @@
-// src/actions/clinics.js
 import prisma from "@/lib/prisma";
 import { getClinicsQuerySchema, updateClinicSchema } from "@/lib/validation";
 
-/** helper local pour formater erreurs Zod en message lisible */
+/** helper pour formatter les erreurs Zod */
 function formatZodError(err) {
   if (!err || !err.errors) return String(err);
   return err.errors
@@ -11,8 +10,8 @@ function formatZodError(err) {
 }
 
 /**
- * Récupère une page de clinics (pour SUPERADMIN).
- * options: { page, limit, search, sort }
+ * Récupérer toutes les cliniques avec pagination, tri et recherche
+ * Inclut l'email du premier admin actif
  */
 export async function getClinics({
   page = 1,
@@ -20,13 +19,10 @@ export async function getClinics({
   search = "",
   sort = "createdAt:desc",
 } = {}) {
-  // validate / coerce query params using the schema from lib/validation
   const parsed = getClinicsQuerySchema.parse({ page, limit, search, sort });
   const take = parsed.limit;
-  const p = parsed.page;
-  const skip = (p - 1) * take;
+  const skip = (parsed.page - 1) * take;
 
-  // simple search sur name/taxId
   const where = parsed.search
     ? {
         OR: [
@@ -36,89 +32,107 @@ export async function getClinics({
       }
     : {};
 
-  // parse sort e.g. createdAt:desc or name:asc
-  let orderBy = { createdAt: "desc" };
-  try {
-    const [field, dir] = parsed.sort.split(":");
-    orderBy = { [field]: dir === "asc" ? "asc" : "desc" };
-  } catch (e) {
-    // keep default
-  }
-
-  // total count pour pagination
   const total = await prisma.clinic.count({ where });
 
   const clinics = await prisma.clinic.findMany({
     where,
-    orderBy,
     skip,
     take,
-    select: {
-      id: true,
-      name: true,
-      taxId: true,
-      address: true,
-      phone: true,
-      subscriptionType: true,
-      subscriptionStatus: true,
-      subscriptionStart: true,
-      subscriptionEnd: true,
-      createdAt: true,
-      updatedAt: true,
+    orderBy: {
+      [parsed.sort.split(":")[0]]:
+        parsed.sort.split(":")[1] === "asc" ? "asc" : "desc",
+    },
+    include: {
+      admins: {
+        where: { isActive: true }, // <-- seulement admins actifs
+        select: {
+          user: { select: { email: true } }, // récupérer email
+        },
+      },
     },
   });
 
-  // pour chaque clinic, calculer les counts (optimisable en batch si besoin)
-  const clinicsWithCounts = await Promise.all(
-    clinics.map(async (c) => {
-      const [
-        adminsCount,
-        doctorsCount,
-        receptionistsCount,
-        patientsCount,
-        appointmentsCount,
-        invoicesCount,
-      ] = await Promise.all([
-        prisma.adminClinic.count({ where: { clinicId: c.id } }),
-        prisma.doctor.count({ where: { clinicId: c.id } }),
-        prisma.receptionist.count({ where: { clinicId: c.id } }),
-        prisma.patient.count({ where: { clinicId: c.id } }),
-        prisma.appointment.count({ where: { clinicId: c.id } }),
-        prisma.invoice.count({ where: { clinicId: c.id } }),
-      ]);
-
-      return {
-        ...c,
-        counts: {
-          staff: adminsCount + doctorsCount + receptionistsCount,
-          admins: adminsCount,
-          doctors: doctorsCount,
-          receptionists: receptionistsCount,
-          patients: patientsCount,
-          appointments: appointmentsCount,
-          invoices: invoicesCount,
-        },
-      };
-    })
-  );
+  const dataWithAdminEmail = clinics.map((clinic) => ({
+    ...clinic,
+    adminEmail: clinic.admins[0]?.user?.email || "N/A",
+    admins: undefined, // optionnel : supprimer la liste complète
+  }));
 
   return {
     meta: {
       total,
-      page: p,
+      page: parsed.page,
       limit: take,
-      pages: Math.ceil(total / take) || 1,
+      pages: Math.max(Math.ceil(total / take), 1),
     },
-    data: clinicsWithCounts,
+    data: dataWithAdminEmail,
   };
 }
 
 /**
- * Récupérer une clinic par id (avec counts et relations essentielles).
- * Si besoin d'autorisation côté route, gère là avant d'appeler cette fonction.
+ * Récupérer les cliniques filtrées pour CLINIC_ADMIN ou liste publique
+ * Inclut email du premier admin actif
+ */
+export async function getFilteredClinics({
+  page = 1,
+  limit = 10,
+  search = "",
+  sort = "createdAt:desc",
+} = {}) {
+  const take = Math.max(1, Number(limit));
+  const skip = (page - 1) * take;
+
+  const where = {
+    isActive: true,
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { taxId: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const total = await prisma.clinic.count({ where });
+
+  const clinics = await prisma.clinic.findMany({
+    where,
+    skip,
+    take,
+    orderBy: {
+      [sort.split(":")[0]]: sort.split(":")[1] === "asc" ? "asc" : "desc",
+    },
+    include: {
+      admins: {
+        where: { isActive: true },
+        select: { user: { select: { email: true } } },
+      },
+    },
+  });
+
+  const dataWithAdminEmail = clinics.map((clinic) => ({
+    ...clinic,
+    adminEmail: clinic.admins[0]?.user?.email || "N/A",
+    admins: undefined,
+  }));
+
+  return {
+    meta: {
+      total,
+      page,
+      limit: take,
+      pages: Math.max(Math.ceil(total / take), 1),
+    },
+    data: dataWithAdminEmail,
+  };
+}
+
+/**
+ * Récupérer une clinique par ID
  */
 export async function getClinicById(id) {
-  if (!id) throw new Error("clinic id is required");
+  if (!id) throw new Error("Clinic id is required");
 
   const clinic = await prisma.clinic.findUnique({
     where: { id: Number(id) },
@@ -147,8 +161,6 @@ export async function getClinicById(id) {
     prisma.patient.count({ where: { clinicId: clinic.id } }),
     prisma.appointment.count({ where: { clinicId: clinic.id } }),
     prisma.invoice.count({ where: { clinicId: clinic.id } }),
-
-    // SOMME DES MONTANTS DES FACTURES
     prisma.invoice.aggregate({
       where: { clinicId: clinic.id },
       _sum: { amount: true },
@@ -156,7 +168,11 @@ export async function getClinicById(id) {
   ]);
 
   return {
-    clinic,
+    clinic: {
+      ...clinic,
+      adminEmail: clinic.admins[0]?.user?.email || "N/A",
+      admins: undefined,
+    },
     counts: {
       staff: adminsCount + doctorsCount + receptionistsCount,
       admins: adminsCount,
@@ -172,35 +188,17 @@ export async function getClinicById(id) {
   };
 }
 
-/**
- * Mettre à jour une clinic (patch)
- * data: { name, taxId, address, phone, subscriptionType, subscriptionStatus, subscriptionEnd, subscriptionStart }
- */
 export async function updateClinic(id, data) {
   if (!id) throw new Error("clinic id is required");
 
-  // validate payload with zod schema imported from lib/validation
-  try {
-    const parsed = updateClinicSchema.parse(data);
+  // Validation et update...
+  const parsed = updateClinicSchema.parse(data);
+  const payload = { ...parsed, updatedAt: new Date() };
 
-    // build payload only with validated fields
-    const payload = {};
-    for (const key of Object.keys(parsed)) {
-      payload[key] = parsed[key];
-    }
-    payload.updatedAt = new Date();
+  const updated = await prisma.clinic.update({
+    where: { id: Number(id) },
+    data: payload,
+  });
 
-    const updated = await prisma.clinic.update({
-      where: { id: Number(id) },
-      data: payload,
-    });
-
-    return updated;
-  } catch (err) {
-    // if zod validation failed, rethrow with a nicer message
-    if (err.name === "ZodError") {
-      throw new Error(formatZodError(err));
-    }
-    throw err;
-  }
+  return updated;
 }

@@ -14,15 +14,30 @@ export async function activateAdminClinicBySuperAdmin(adminId, superAdminId) {
   });
   if (!superAdmin) throw new Error("SuperAdmin not found");
 
-  // Activer l'AdminClinic
-  const adminClinic = await prisma.adminClinic.update({
+  // Récupérer l'AdminClinic avec sa clinique
+  const adminClinic = await prisma.adminClinic.findUnique({
+    where: { id: adminId },
+    include: { clinic: true },
+  });
+
+  if (!adminClinic) throw new Error("AdminClinic not found");
+
+  // Activer l'AdminClinic et sa clinique
+  const updatedClinic = adminClinic.clinic
+    ? await prisma.clinic.update({
+        where: { id: adminClinic.clinic.id },
+        data: { isActive: true, updatedAt: new Date() },
+      })
+    : null;
+
+  const updatedAdminClinic = await prisma.adminClinic.update({
     where: { id: adminId },
     data: { isActive: true, updatedAt: new Date() },
   });
 
   // Notifier l'utilisateur
   const user = await prisma.user.findUnique({
-    where: { id: adminClinic.userId },
+    where: { id: updatedAdminClinic.userId },
   });
 
   if (user) {
@@ -33,8 +48,9 @@ export async function activateAdminClinicBySuperAdmin(adminId, superAdminId) {
     });
   }
 
-  return adminClinic;
+  return { updatedAdminClinic, updatedClinic };
 }
+
 export async function getUsersByRole(role) {
   if (!role) throw new Error("Role is required");
 
