@@ -1,49 +1,66 @@
+// /api/subscriptions/route.js
+
 import prisma from "@/lib/prisma";
-import {
-  activateSubscription,
-  autoUpdateSubscriptions,
-  getFilteredSubscriptions,
-} from "@/actions/subscriptions";
-import jwt from "jsonwebtoken"; // ou la lib que tu utilises pour JWT
+import jwt from "jsonwebtoken";
+import { autoUpdateSubscriptions } from "@/actions/subscriptions";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export async function GET(req) {
   try {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer "))
-      return new Response("Unauthorized", { status: 401 });
-
-    const token = authHeader.split(" ")[1];
-
-    let user;
-    try {
-      user = jwt.verify(token, JWT_SECRET);
-    } catch {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    if (user.role !== "SUPERADMIN")
+    const token = authHeader.split(" ")[1];
+    let user;
+    try {
+      user = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    if (user.role !== "SUPERADMIN") {
       return new Response("Forbidden", { status: 403 });
+    }
 
     const url = new URL(req.url);
-
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
-
-    const search = url.searchParams.get("search") || "";
-    const type = url.searchParams.get("type") || "";
-    const status = url.searchParams.get("status") || "";
+    const skip = (page - 1) * limit;
 
     await autoUpdateSubscriptions();
 
-    const { clinics, total } = await getFilteredSubscriptions({
-      page,
-      limit,
-      search,
-      type,
-      status,
-    });
+    // Get filters from query params
+    const search = url.searchParams.get("search") || "";
+    const subscriptionType = url.searchParams.get("subscriptionType") || "";
+    const subscriptionStatus = url.searchParams.get("subscriptionStatus") || "";
+    const startDate = url.searchParams.get("startDate");
+    const endDate = url.searchParams.get("endDate");
+
+    // Build Prisma where clause
+    const where = {};
+
+    if (search) where.name = { contains: search, mode: "insensitive" };
+    if (subscriptionType) where.subscriptionType = subscriptionType;
+    if (subscriptionStatus) where.subscriptionStatus = subscriptionStatus;
+    if (startDate || endDate) {
+      where.subscriptionStart = {};
+      if (startDate) where.subscriptionStart.gte = new Date(startDate);
+      if (endDate) where.subscriptionStart.lte = new Date(endDate);
+    }
+
+    const [clinics, total] = await Promise.all([
+      prisma.clinic.findMany({
+        where,
+        include: { admins: { include: { user: true } } },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.clinic.count({ where }),
+    ]);
 
     return new Response(
       JSON.stringify({
