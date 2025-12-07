@@ -24,7 +24,7 @@ const menus = {
       path: "/dashboard/superadmin/subscriptions",
       icon: CreditCardIcon,
     },
-    { name: "Profile", path: "/dashboard/superadmin/profile", icon: UserIcon },
+    { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
   ],
 };
 

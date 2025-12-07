@@ -1,6 +1,7 @@
 // Correct pour ton setup actuel
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { updateUserSchema } from "@/lib/validation";
 
 // Activer un AdminClinic par SuperAdmin
 export async function activateAdminClinicBySuperAdmin(adminId, superAdminId) {

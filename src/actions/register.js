@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email";
 const SALT_ROUNDS = 10;
 
 // Durée des plans d'abonnement en mois
-const SUBSCRIPTION_DURATION_MONTHS = { FREE: 0, PRO: 3, ENTERPRISE: 12 };
+const SUBSCRIPTION_DURATION_MONTHS = { FREE: 1, PRO: 3, ENTERPRISE: 12 };
 
 /**
  * Fonction pour enregistrer un utilisateur selon son rôle

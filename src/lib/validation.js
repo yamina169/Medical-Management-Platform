@@ -1,3 +1,4 @@
+// /lib/validation.js
 import { z } from "zod";
 
 // === Enum pour les plans d'abonnement ===
@@ -103,3 +104,78 @@ export const resetSchema = z.object({
   token: z.string().min(1, "Token requis"),
   newPassword: z.string().min(6, "Mot de passe trop court"),
 });
+
+/**
+ * ===== validations partagées pour clinics (migrées depuis actions/clinics.js) =====
+ */
+
+/** subscriptionStatus enum (exporté pour réutilisation) */
+export const subscriptionStatusEnum = z.enum([
+  "ACTIVE",
+  "PENDING_PAYMENT",
+  "EXPIRED",
+  "TRIAL",
+]);
+
+/**
+ * Query params pour getClinics (coercition + defaults)
+ * - page, limit: coercés en integer >= 1
+ * - search: string
+ * - sort: string (ex: "createdAt:desc")
+ */
+export const getClinicsQuerySchema = z.object({
+  page: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return 1;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(1, Math.trunc(n)) : 1;
+  }, z.number().int().min(1)),
+  limit: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return 10;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(1, Math.trunc(n)) : 10;
+  }, z.number().int().min(1)),
+  search: z.preprocess((v) => (v == null ? "" : String(v)), z.string()),
+  sort: z.preprocess(
+    (v) => (v == null ? "createdAt:desc" : String(v)),
+    z.string()
+  ),
+});
+
+/**
+ * Payload pour updateClinic
+ * - accepte ISO strings ou Date pour subscriptionStart / subscriptionEnd
+ * - vérifie qu'au moins un champ est fourni
+ */
+export const updateClinicSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    taxId: z.string().min(1).optional(),
+    address: z.string().optional(),
+    phone: z.string().optional(),
+    subscriptionType: subscriptionTypeEnum.optional(),
+    subscriptionStatus: subscriptionStatusEnum.optional(),
+    subscriptionStart: z.preprocess((v) => {
+      if (v == null) return undefined;
+      const d = v instanceof Date ? v : new Date(String(v));
+      return isNaN(d.getTime()) ? undefined : d;
+    }, z.date().optional()),
+    subscriptionEnd: z.preprocess((v) => {
+      if (v == null) return undefined;
+      const d = v instanceof Date ? v : new Date(String(v));
+      return isNaN(d.getTime()) ? undefined : d;
+    }, z.date().optional()),
+  })
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: "Au moins un champ doit être fourni pour la mise à jour",
+  });
+
+// /lib/validation.js (ajouter à la fin)
+export const updateUserSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    password: z.string().min(6).optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Au moins un champ doit être fourni pour la mise à jour",
+  });
