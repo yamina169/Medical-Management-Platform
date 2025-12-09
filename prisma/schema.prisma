@@ -8,19 +8,21 @@ datasource db {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  name         String
-  email        String        @unique
-  password     String
-  role         RoleEnum
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      RoleEnum
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  superAdmin   SuperAdmin?
   adminClinic  AdminClinic?
   doctor       Doctor?
-  patient      Patient?
   receptionist Receptionist?
-  superAdmin   SuperAdmin?
+  patient      Patient?
 }
+
 
 model SuperAdmin {
   id        Int      @id @default(autoincrement())
@@ -55,7 +57,7 @@ model AdminClinic {
   id        Int      @id @default(autoincrement())
   clinicId  Int?
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   isActive  Boolean  @default(false)
   userId    Int      @unique
   clinic    Clinic?  @relation(fields: [clinicId], references: [id])
@@ -76,46 +78,41 @@ model Receptionist {
   clinicId     Int
   isActive     Boolean       @default(true)
   createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @default(now())
-  doctorId     Int?          @unique
+  updatedAt    DateTime      @updatedAt
   appointments Appointment[] @relation("ReceptionistAppointments")
-  patients     Patient[]     @relation("ReceptionistPatients")
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
-  doctor       Doctor?       @relation("DoctorReceptionist", fields: [doctorId], references: [id])
   user         User          @relation(fields: [userId], references: [id])
+  doctors      Doctor[]      @relation("DoctorReceptionist") // N:N
 }
 
 model Doctor {
   id               Int             @id @default(autoincrement())
   userId           Int             @unique
   clinicId         Int
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @default(now())
   specializationId Int?
+  isActive         Boolean         @default(true) // <-- nouveau champ
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   appointments     Appointment[]   @relation("DoctorAppointments")
   clinic           Clinic          @relation(fields: [clinicId], references: [id])
   specialization   Specialization? @relation(fields: [specializationId], references: [id])
   user             User            @relation(fields: [userId], references: [id])
   medicalRecords   MedicalRecord[]
-  patients         Patient[]       @relation("DoctorPatients")
-  receptionist     Receptionist?   @relation("DoctorReceptionist")
+  patients         Patient[]       @relation("DoctorPatients") // N:N
+  receptionists    Receptionist[]  @relation("DoctorReceptionist") // N:N
 }
 
 model Patient {
   id             Int             @id @default(autoincrement())
-  registeredBy   Int?
   clinicId       Int
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @default(now())
   userId         Int             @unique
-  doctorId       Int?
-  receptionistId Int?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   appointments   Appointment[]
   invoices       Invoice[]
   medicalRecords MedicalRecord[]
   clinic         Clinic          @relation(fields: [clinicId], references: [id])
-  doctor         Doctor?         @relation("DoctorPatients", fields: [doctorId], references: [id])
-  receptionist   Receptionist?   @relation("ReceptionistPatients", fields: [receptionistId], references: [id])
+  doctors        Doctor[]        @relation("DoctorPatients") // N:N
   user           User            @relation(fields: [userId], references: [id])
 }
 
@@ -128,7 +125,7 @@ model Appointment {
   date           DateTime
   status         AppointmentStatus
   createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   clinic         Clinic            @relation(fields: [clinicId], references: [id])
   doctor         Doctor            @relation("DoctorAppointments", fields: [doctorId], references: [id])
   patient        Patient           @relation(fields: [patientId], references: [id])
@@ -142,7 +139,7 @@ model MedicalRecord {
   description   String
   prescriptions Json?
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   doctor        Doctor   @relation(fields: [doctorId], references: [id])
   patient       Patient  @relation(fields: [patientId], references: [id])
 }
@@ -155,7 +152,7 @@ model Invoice {
   status        InvoiceStatus
   paymentMethod String?
   createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   clinic        Clinic        @relation(fields: [clinicId], references: [id])
   patient       Patient       @relation(fields: [patientId], references: [id])
 }

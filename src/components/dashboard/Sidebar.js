@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -8,21 +6,46 @@ import {
   ClipboardIcon,
   ArrowLeftOnRectangleIcon,
   UserIcon,
-  CreditCardIcon,
+  BeakerIcon,
+  BuildingLibraryIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
-
 const menus = {
   SUPERADMIN: [
     { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
     {
       name: "Clinics",
-      path: "/dashboard/superadmin/clinics",
+      path: "/dashboard/superadmin-dashboard/clinics",
       icon: ClipboardIcon,
     },
     {
       name: "Subscriptions",
-      path: "/dashboard/superadmin/subscriptions",
-      icon: CreditCardIcon,
+      path: "/dashboard/superadmin-dashboard/subscriptions",
+      icon: BeakerIcon,
+    },
+    { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
+  ],
+
+  ADMIN_CLINIC: [
+    {
+      name: "Patients",
+      path: "/dashboard/admin-clinc-dashboard/patients",
+      icon: UserIcon, // tu peux changer l’icône si tu veux
+    },
+    {
+      name: "Receptionists",
+      path: "/dashboard/admin-clinc-dashboard/receptionists",
+      icon: UserGroupIcon,
+    },
+    {
+      name: "Doctors",
+      path: "/dashboard/admin-clinc-dashboard/doctors",
+      icon: BeakerIcon,
+    },
+    {
+      name: "Clinic Settings",
+      path: "/dashboard/admin-clinc-dashboard/settings",
+      icon: BuildingLibraryIcon,
     },
     { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
   ],
@@ -35,15 +58,14 @@ export default function Sidebar({ userRole }) {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     router.push("/login");
   };
 
   const isActive = (itemPath) => {
-    // Comparer exact pour dashboard et profil
     if (itemPath === "/dashboard" || itemPath === "/dashboard/profil") {
       return pathname === itemPath;
     }
-    // Pour les sous-routes
     return pathname.startsWith(itemPath);
   };
 

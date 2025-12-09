@@ -25,7 +25,7 @@ export default function AdminCard({ user }) {
 
   const fetchAdmins = async () => {
     try {
-      const res = await fetch("/api/users?role=ADMIN_CLINIC");
+      const res = await fetch("/api/admins?role=ADMIN_CLINIC");
       const data = await res.json();
       // filtrer seulement les non activés
       setAdmins(data.filter((a) => !a.isActive));
@@ -49,7 +49,7 @@ export default function AdminCard({ user }) {
     setNotice(null);
 
     try {
-      const res = await fetch("/api/users", {
+      const res = await fetch("/api/admins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminId, superAdminId: user.id }),

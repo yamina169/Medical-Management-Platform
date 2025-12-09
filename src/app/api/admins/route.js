@@ -1,33 +1,25 @@
 // src/app/api/users/route.js
-import {
-  getUsersByRole,
-  activateAdminClinicBySuperAdmin,
-} from "@/actions/users";
+// src/app/api/users/route.js
 
-/**
- * GET /api/users?role=ROLE_NAME
- * Récupère les utilisateurs par rôle
- */
+import {
+  getAdminsClinic,
+  activateAdminClinicBySuperAdmin,
+} from "@/actions/admins";
+
 export async function GET(req) {
   try {
     const url = new URL(req.url);
     const role = url.searchParams.get("role")?.trim();
 
-    if (!role) {
-      return new Response(JSON.stringify({ error: "Role is required" }), {
-        status: 400,
-      });
+    // Si le rôle est ADMIN_CLINIC → appeler la bonne fonction
+    if (role === "ADMIN_CLINIC") {
+      const admins = await getAdminsClinic();
+      return Response.json(admins, { status: 200 });
     }
 
-    const users = await getUsersByRole(role);
-    return new Response(JSON.stringify(users), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ error: "Invalid role" }, { status: 400 });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-    });
+    return Response.json({ error: err.message }, { status: 500 });
   }
 }
 

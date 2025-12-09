@@ -13,9 +13,11 @@ export default function RootLayout({ children }) {
     "/register",
     "/reset-password",
     "/dashboard",
-    "/dashboard/superadmin/clinics",
-    "/dashboard/superadmin/subscriptions",
+    "/dashboard/superadmin-dashboard/clinics",
+    "/dashboard/superadmin-dashboard/subscriptions",
     "/dashboard/profil",
+    "/dashboard/admin-clinc-dashboard/doctors",
+    "/dashboard/admin-clinc-dashboard/doctors/new",
   ];
 
   const hideLayout = noLayoutPages.includes(pathname);

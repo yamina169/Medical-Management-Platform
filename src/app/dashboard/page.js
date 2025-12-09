@@ -8,12 +8,13 @@ export default function DashboardPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Récupérer l'utilisateur complet depuis localStorage
+    // Récupérer l'utilisateur depuis localStorage
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser); // stocke tout l'objet user
-      console.log("User ID:", parsedUser.id); // afficher l'ID dans la console
+      setUser(parsedUser);
+      console.log("User ID:", parsedUser.id);
+      console.log("User Role:", parsedUser.role);
     }
   }, []);
 
@@ -21,9 +22,18 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 space-y-5">
-      <Statistics />
+      {user.role === "SUPERADMIN" && (
+        <>
+          <Statistics />
+          <AdminCard user={user} />
+        </>
+      )}
 
-      <AdminCard user={user} />
+      {user.role === "ADMIN_CLINIC" && (
+        <div className="p-6 bg-white rounded-2xl shadow-md text-center text-xl font-medium">
+          Hello, {user.name || "Clinic Admin"}!
+        </div>
+      )}
     </div>
   );
 }

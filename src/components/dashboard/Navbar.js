@@ -40,11 +40,13 @@ export default function Navbar() {
   const fetchNotifications = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
+
     try {
       setLoading(true);
       const res = await fetch("/api/notifications", {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (res.ok) {
         const data = await res.json();
         setNotifications({
@@ -55,12 +57,8 @@ export default function Navbar() {
             : [],
         });
       } else {
-        console.error("Notifications fetch error:", res.status);
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          window.location.reload();
-        }
+        // On ignore toutes les erreurs pour ne pas vider le localStorage
+        console.warn("Notifications fetch error:", res.status);
       }
     } catch (err) {
       console.error("Erreur fetch notifications:", err);
