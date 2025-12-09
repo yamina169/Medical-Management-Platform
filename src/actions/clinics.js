@@ -10,7 +10,7 @@ function formatZodError(err) {
 }
 
 /* ===========================================================
-    1.   STATS GLOBALES (SUPERADMIN DASHBOARD)
+    1.   STATS GLOBALES  des clincs (SUPERADMIN DASHBOARD)
    =========================================================== */
 
 /** Static prices for each subscription type */
@@ -136,10 +136,31 @@ export async function getFilteredClinics({
     3.   GET CLINIC BY ID
    =========================================================== */
 export async function getClinicById(id) {
-  if (!id) throw new Error("Clinic id is required");
+  // ICI id = userId
+  if (!id) throw new Error("User id is required");
 
+  const userId = Number(id);
+  if (isNaN(userId)) throw new Error("User id must be numeric");
+
+  // 1) Trouver le clinicId depuis AdminClinic
+  const adminRecord = await prisma.adminClinic.findUnique({
+    where: { userId },
+    select: { clinicId: true },
+  });
+
+  if (!adminRecord) {
+    throw new Error("No clinic found for this user");
+  }
+
+  if (!adminRecord.clinicId) {
+    throw new Error("User is admin but clinicId is null");
+  }
+
+  const clinicId = adminRecord.clinicId;
+
+  // 2) Récupérer les infos de la clinique
   const clinic = await prisma.clinic.findUnique({
-    where: { id: Number(id) },
+    where: { id: clinicId },
     include: {
       admins: { include: { user: true } },
       doctors: { include: { user: true } },
@@ -150,6 +171,8 @@ export async function getClinicById(id) {
 
   if (!clinic) throw new Error("Clinic not found");
 
+  // 3) Comptages (counts)
+  // 3) Comptages (counts)
   const [
     adminsCount,
     doctorsCount,
@@ -157,20 +180,46 @@ export async function getClinicById(id) {
     patientsCount,
     appointmentsCount,
     invoicesCount,
-    totalInvoicesAmount,
+    invoices,
   ] = await Promise.all([
-    prisma.adminClinic.count({ where: { clinicId: clinic.id } }),
-    prisma.doctor.count({ where: { clinicId: clinic.id } }),
-    prisma.receptionist.count({ where: { clinicId: clinic.id } }),
-    prisma.patient.count({ where: { clinicId: clinic.id } }),
+    prisma.adminClinic.count({
+      where: { clinicId: clinic.id, isActive: true },
+    }),
+    prisma.doctor.count({ where: { clinicId: clinic.id, isActive: true } }),
+    prisma.receptionist.count({
+      where: { clinicId: clinic.id, isActive: true },
+    }),
+    prisma.patient.count({ where: { clinicId: clinic.id, isActive: true } }),
     prisma.appointment.count({ where: { clinicId: clinic.id } }),
-    prisma.invoice.count({ where: { clinicId: clinic.id } }),
-    prisma.invoice.aggregate({
-      where: { clinicId: clinic.id },
-      _sum: { amount: true },
+    prisma.invoice.count({ where: { clinicId: clinic.id, status: "PAID" } }),
+    prisma.invoice.findMany({
+      where: { clinicId: clinic.id, status: "PAID" },
+      select: { amount: true, createdAt: true },
     }),
   ]);
 
+  // 4) Calcul total + revenue par mois
+  const monthlyAmounts = {};
+  let totalAmount = 0;
+
+  invoices.forEach((inv) => {
+    totalAmount += inv.amount;
+    const d = new Date(inv.createdAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}`;
+    monthlyAmounts[key] = (monthlyAmounts[key] || 0) + inv.amount;
+  });
+
+  const revenueByMonth = Object.keys(monthlyAmounts)
+    .sort()
+    .map((month) => ({
+      month,
+      amount: monthlyAmounts[month],
+    }));
+
+  // 5) Retour formaté identique à ton ancienne version
   return {
     clinic: {
       ...clinic,
@@ -187,7 +236,8 @@ export async function getClinicById(id) {
       invoices: invoicesCount,
     },
     totals: {
-      invoicesAmount: totalInvoicesAmount._sum.amount ?? 0,
+      invoicesAmount: totalAmount,
+      revenueByMonth,
     },
   };
 }
@@ -195,14 +245,33 @@ export async function getClinicById(id) {
 /* ===========================================================
     4.   UPDATE CLINIC
    =========================================================== */
-export async function updateClinic(id, data) {
-  if (!id) throw new Error("clinic id is required");
+export async function updateClinic(userId, data) {
+  if (!userId) throw new Error("User id is required");
 
+  const idUser = Number(userId);
+  if (isNaN(idUser)) throw new Error("User id must be numeric");
+
+  // 1) Trouver le clinicId depuis AdminClinic
+  const adminRecord = await prisma.adminClinic.findUnique({
+    where: { userId: idUser },
+    select: { clinicId: true },
+  });
+
+  if (!adminRecord || !adminRecord.clinicId) {
+    throw new Error("No clinic found for this user");
+  }
+
+  const clinicId = adminRecord.clinicId;
+
+  // 2) Valider les données
   const parsed = updateClinicSchema.parse(data);
   const payload = { ...parsed, updatedAt: new Date() };
 
-  return await prisma.clinic.update({
-    where: { id: Number(id) },
+  // 3) Mettre à jour la clinique
+  const updatedClinic = await prisma.clinic.update({
+    where: { id: clinicId },
     data: payload,
   });
+
+  return updatedClinic;
 }

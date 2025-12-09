@@ -79,63 +79,25 @@ export async function GET(req) {
     );
   }
 }
-
 export async function PUT(req) {
   try {
     const user = getUserFromJWT(req);
-    if (!user || user.role !== "ADMIN_CLINIC") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    if (!user)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
 
     const body = await req.json();
-    const { id, ...data } = body;
 
-    if (!id) {
-      return NextResponse.json(
-        { error: "Clinic id is required" },
-        { status: 400 }
-      );
-    }
+    // Mettre à jour la clinique correspondant à cet userId
+    const updatedClinic = await updateClinic(user.id, body);
 
-    // Vérifier que l'admin appartient à la clinique
-    const clinic = await getClinicById(Number(id));
-    const isAdminOfClinic = clinic.clinic.adminEmail;
-
-    if (!isAdminOfClinic) {
-      return NextResponse.json(
-        { error: "You are not admin of this clinic" },
-        { status: 403 }
-      );
-    }
-
-    // Champs autorisés
-    const allowedFields = [
-      "name",
-      "taxId",
-      "address",
-      "phone",
-      "subscriptionType",
-      "subscriptionStatus",
-      "subscriptionStart",
-      "subscriptionEnd",
-    ];
-
-    const payload = {};
-    for (const key of allowedFields) {
-      if (key in data) payload[key] = data[key];
-    }
-
-    await updateClinic(Number(id), payload);
-    const updatedClinic = await getClinicById(Number(id));
-
-    return NextResponse.json(
-      { message: "Clinic updated", clinic: updatedClinic },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true, data: updatedClinic });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
-      { error: err.message || "Something went wrong" },
+      { success: false, error: err.message || "Erreur lors de la mise à jour" },
       { status: 500 }
     );
   }

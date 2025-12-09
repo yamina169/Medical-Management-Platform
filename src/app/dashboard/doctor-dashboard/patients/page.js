@@ -23,7 +23,6 @@ export default function PatientsPage() {
         }
       );
       const data = await res.json();
-      console.log(data);
       if (data.success) {
         setPatients(data.data);
         setTotal(data.total);

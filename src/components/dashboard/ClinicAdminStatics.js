@@ -15,97 +15,131 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export default function Statics() {
-  const [stats, setStats] = useState(null);
+export default function ClinicAdminStatistics() {
+  const [clinic, setClinic] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   useEffect(() => {
     let mounted = true;
-    async function loadStats() {
+    async function fetchClinic() {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch("/api/clinics?stats=true", { headers });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(`API ${res.status} ${text}`);
+        const token =
+          typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        if (!token) {
+          if (!mounted) return;
+          setError("Aucun token trouvé.");
+          return;
         }
+
+        // décodage token
+        let userId;
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          userId = payload?.id;
+        } catch (e) {
+          if (!mounted) return;
+          setError("Token invalide.");
+          return;
+        }
+
+        if (!userId) {
+          if (!mounted) return;
+          setError("User ID introuvable dans le token.");
+          return;
+        }
+
+        const res = await fetch(`/api/clinics?id=${userId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          throw new Error(`API ${res.status} ${txt}`);
+        }
+
         const data = await res.json();
         if (!mounted) return;
-        setStats(data);
+
+        if (!data?.clinic) {
+          setError("Aucune clinique trouvée pour cet utilisateur");
+          return;
+        }
+
+        // On combine la clinique et les totals/counts
+        setClinic({
+          ...data.clinic,
+          counts: data.counts ?? {},
+          totals: data.totals ?? {},
+        });
       } catch (err) {
-        console.error("Erreur stats:", err);
-        if (mounted) setStats(null);
+        console.error(err);
+        if (mounted) setError(err.message || "Une erreur est survenue.");
       } finally {
         if (mounted) setLoading(false);
       }
     }
-    loadStats();
+
+    fetchClinic();
     return () => {
       mounted = false;
     };
   }, []);
 
+  // --- Construire une map month -> amount à partir de clinic.totals.revenueByMonth ou totals.revenueByMonth/invoiceByMonth ---
   const revenueMap = useMemo(() => {
     const map = {};
-    if (!Array.isArray(stats?.monthlyRevenue)) return map;
-    for (const item of stats.monthlyRevenue) {
-      if (!item?.month) continue;
-      const rev = Number(item.revenue);
-      map[item.month] = Number.isFinite(rev) ? rev : 0;
+    const arr = clinic?.totals?.revenueByMonth ?? clinic?.totals?.amounts ?? [];
+    if (!Array.isArray(arr)) return map;
+    for (const it of arr) {
+      if (!it?.month) continue;
+      const num = Number(it.amount ?? it.revenue ?? it.value ?? 0);
+      map[it.month] = Number.isFinite(num) ? num : 0;
     }
     return map;
-  }, [stats]);
+  }, [clinic]);
 
+  // années disponibles (ex: "2025")
   const yearOptions = useMemo(() => {
-    if (Array.isArray(stats?.monthlyRevenue) && stats.monthlyRevenue.length) {
-      const years = new Set(
-        stats.monthlyRevenue.map((r) => String(r.month).slice(0, 4))
-      );
-      return Array.from(years).sort((a, b) => Number(b) - Number(a));
+    const arr = Object.keys(revenueMap);
+    if (!arr.length) {
+      return Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i));
     }
-    return Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i));
-  }, [stats, now]);
+    const years = new Set(arr.map((m) => String(m).slice(0, 4)));
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [revenueMap, now]);
 
+  // s'assurer que selectedYear est valide
   useEffect(() => {
     if (!yearOptions || !yearOptions.length) return;
     if (!yearOptions.includes(String(selectedYear))) {
       setSelectedYear(Number(yearOptions[0]));
     }
-  }, [yearOptions, selectedYear]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearOptions]);
 
+  // tableau des 12 mois de l'année sélectionnée
   const yearMonthlyArray = useMemo(() => {
-    return Array.from({ length: 12 }, (_, i) => {
+    const arr = Array.from({ length: 12 }, (_, i) => {
       const month = String(i + 1).padStart(2, "0");
       const key = `${selectedYear}-${month}`;
       return revenueMap[key] ?? 0;
     });
+    return arr;
   }, [revenueMap, selectedYear]);
 
   const annualTotal = useMemo(
-    () => yearMonthlyArray.reduce((sum, val) => sum + (Number(val) || 0), 0),
+    () => yearMonthlyArray.reduce((s, v) => s + (Number(v) || 0), 0),
     [yearMonthlyArray]
   );
 
-  const topCards = [
-    {
-      title: "Clinics Actives",
-      value: loading ? "..." : stats?.activeClinics ?? 0,
-      icon: <BuildingOfficeIcon className="h-6 w-6" />,
-      description: "Nombre total des cliniques actives",
-      color: "bg-blue-500",
-    },
-    {
-      title: "Subscriptions Actives",
-      value: loading ? "..." : stats?.activeSubscriptions ?? 0,
-      icon: <CreditCardIcon className="h-6 w-6" />,
-      description: "Abonnements PRO / ENTERPRISE actuellement actifs",
-      color: "bg-purple-500",
-    },
-  ];
+  const fmt = (n) =>
+    n === "..." || n === null
+      ? n
+      : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
   const monthNamesShort = [
     "01",
@@ -121,18 +155,45 @@ export default function Statics() {
     "11",
     "12",
   ];
-  const fmt = (n) =>
-    n === "..." || n === null
-      ? n
-      : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+  // Top cards pour la clinique
+  const topCards = [
+    {
+      title: "Médecins",
+      value: clinic ? clinic.counts?.doctors ?? 0 : "...",
+      icon: <CreditCardIcon className="h-6 w-6" />,
+      description: "Nombre de médecins actifs rattachés",
+      color: "bg-purple-500",
+    },
+    {
+      title: "Patients",
+      value: clinic ? clinic.counts?.patients ?? 0 : "...",
+      icon: <BuildingOfficeIcon className="h-6 w-6" />,
+      description: "Nombre de patients actifs",
+      color: "bg-blue-500",
+    },
+    {
+      title: "Réceptionnistes",
+      value: clinic ? clinic.counts?.receptionists ?? 0 : "...",
+      icon: <BuildingOfficeIcon className="h-6 w-6" />,
+      description: "Nombre de réceptionnistes actifs",
+      color: "bg-green-500",
+    },
+  ];
+
+  if (loading) return <p>Chargement...</p>;
+  if (error) return <p className="text-red-500">Erreur : {error}</p>;
+  if (!clinic) return <p>Aucune donnée trouvée.</p>;
 
   return (
     <div className="space-y-8 p-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <h1 className="text-2xl font-bold">Statistiques — {clinic.name}</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {topCards.map((card) => (
           <div
             key={card.title}
-            className={`flex items-center justify-between gap-4 p-6 bg-gradient-to-r from-white/70 to-white/40 backdrop-blur-md border border-gray-200 rounded-3xl shadow-lg hover:scale-105 transition-transform`}
+            className={`flex items-center justify-between gap-4 p-6 bg-gradient-to-r from-white/70 to-white/40 backdrop-blur-md border border-gray-200 rounded-3xl shadow-lg`}
           >
             <div className="flex items-center gap-4">
               <div
@@ -144,7 +205,7 @@ export default function Statics() {
                 <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">
                   {card.title}
                 </p>
-                <p className="mt-1 text-3xl font-bold text-gray-900">
+                <p className="mt-1 text-2xl font-bold text-gray-900">
                   {fmt(card.value)}
                 </p>
                 <p className="mt-2 text-xs text-gray-400">{card.description}</p>
@@ -154,7 +215,7 @@ export default function Statics() {
         ))}
       </div>
 
-      <div className="p-4 bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-md hover:shadow-lg transition-shadow w-full">
+      <div className="p-4 bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-md w-full">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="p-3 rounded-xl bg-green-500 text-white shadow-md">
@@ -165,15 +226,14 @@ export default function Statics() {
                 Revenu Annuel
               </p>
               <h2 className="mt-1 text-2xl md:text-3xl font-extrabold text-gray-900">
-                {loading ? "..." : `${fmt(annualTotal)} TND`}
+                {`${fmt(annualTotal)} TND`}
               </h2>
               <p className="mt-1 text-xs text-gray-500">
                 Montant total pour l'année{" "}
                 <span className="font-medium text-gray-700">
                   {selectedYear}
                 </span>
-                . Calcul basé sur prix statiques par abonnement (PRO = 150,
-                ENTREPRISE = 280) au mois de démarrage.
+                . Données extraites des montants d'invoices de la clinique.
               </p>
             </div>
           </div>
@@ -211,10 +271,10 @@ export default function Statics() {
               <Tooltip
                 formatter={(value) => `${value} TND`}
                 contentStyle={{
-                  backgroundColor: "rgba(255,255,255,0.9)",
+                  backgroundColor: "rgba(255,255,255,0.95)",
                   borderRadius: "8px",
                   border: "none",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
                 }}
               />
               <Line

@@ -47,8 +47,13 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
   });
 
   // Create patient
+  // Création du patient
   const patient = await prisma.patient.create({
-    data: { userId: user.id, clinicId },
+    data: {
+      userId: user.id,
+      clinicId,
+      phoneNumber: payload.phoneNumber, // valeur par défaut si non fournie
+    },
     include: { user: true, clinic: true },
   });
 
@@ -62,19 +67,12 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
 
   return patient;
 }
-
-/**
- * Get patients filtered by clinic of the admin
- * @param {string} tokenJWT - "Bearer <token>"
- * @param {Object} options - search, page, limit
- */
 export async function getPatients(
   tokenJWT,
   { search = "", page = 1, limit = 10 } = {}
 ) {
   if (!tokenJWT) throw new Error("Token is required");
 
-  // Décoder le token pour récupérer adminUserId
   const token = tokenJWT.replace("Bearer ", "");
   const payloadBase64 = token.split(".")[1];
   const decodedPayload = JSON.parse(
@@ -83,7 +81,6 @@ export async function getPatients(
   const adminUserId = decodedPayload.id;
   if (!adminUserId) throw new Error("Invalid token payload");
 
-  // Récupérer la clinicId de l'admin
   const adminRecord = await prisma.adminClinic.findFirst({
     where: { userId: adminUserId },
     select: { clinicId: true },
@@ -91,29 +88,43 @@ export async function getPatients(
   if (!adminRecord) throw new Error("Admin clinic not found");
   const clinicId = adminRecord.clinicId;
 
-  // Pagination
   const skip = (page - 1) * limit;
-  const q = (search || "").trim();
+  const q = search.trim();
 
-  // Filtrage
   const where = {
-    clinicId, // uniquement les patients de la même clinique
+    clinicId,
+    isActive: true,
     ...(q && {
       OR: [
         { user: { is: { name: { contains: q, mode: "insensitive" } } } },
         { user: { is: { email: { contains: q, mode: "insensitive" } } } },
+        { phoneNumber: { contains: q } },
       ],
     }),
   };
 
   const total = await prisma.patient.count({ where });
 
+  // ✅ Utiliser select sur le niveau patient pour inclure phoneNumber ET user
   const data = await prisma.patient.findMany({
     where,
-    include: { user: true, clinic: true },
     skip,
     take: limit,
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      userId: true,
+      clinicId: true,
+      phoneNumber: true, // récupère correctement le numéro
+      createdAt: true,
+      updatedAt: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 
   const mapped = data.map((p) => ({
@@ -122,6 +133,7 @@ export async function getPatients(
     clinicId: p.clinicId,
     name: p.user?.name || null,
     email: p.user?.email || null,
+    phoneNumber: p.phoneNumber || null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   }));
@@ -138,10 +150,16 @@ export async function updatePatient(id, data) {
   if (data.email) userData.email = data.email;
   if (data.password) userData.password = await bcrypt.hash(data.password, 10);
 
+  const patientData = {};
+  if (data.phoneNumber) patientData.phoneNumber = data.phoneNumber;
+
   try {
     return await prisma.patient.update({
       where: { id: Number(id) },
-      data: { user: { update: userData } },
+      data: {
+        user: { update: userData },
+        ...(patientData && { phoneNumber: patientData.phoneNumber }),
+      },
       include: { user: true },
     });
   } catch (err) {

@@ -11,13 +11,8 @@ export async function GET(req) {
     const url = new URL(req.url);
     const role = url.searchParams.get("role")?.trim();
 
-    // Si le rôle est ADMIN_CLINIC → appeler la bonne fonction
-    if (role === "ADMIN_CLINIC") {
-      const admins = await getAdminsClinic();
-      return Response.json(admins, { status: 200 });
-    }
-
-    return Response.json({ error: "Invalid role" }, { status: 400 });
+    const admins = await getAdminsClinic();
+    return Response.json(admins, { status: 200 });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 });
   }

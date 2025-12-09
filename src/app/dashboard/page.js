@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import AdminCard from "@/components/dashboard/AdminCard";
-import Statistics from "@/components/dashboard/Statistics";
+import StatisticsSuperAdmin from "@/components/dashboard/StatisticsSuperAdmin";
+import ClinicAdminStatics from "@/components/dashboard/ClinicAdminStatics";
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
@@ -24,16 +25,16 @@ export default function DashboardPage() {
     <div className="p-4 space-y-5">
       {user.role === "SUPERADMIN" && (
         <>
-          <Statistics />
+          <StatisticsSuperAdmin />
           <AdminCard user={user} />
         </>
       )}
-
       {user.role === "ADMIN_CLINIC" && (
-        <div className="p-6 bg-white rounded-2xl shadow-md text-center text-xl font-medium">
-          Hello, {user.name || "Clinic Admin"}!
-        </div>
+        <>
+          <ClinicAdminStatics user={user} />
+        </>
       )}
+      {/* Vous pouvez ajouter d'autres rôles ici si nécessaire */}
     </div>
   );
 }

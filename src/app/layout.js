@@ -21,6 +21,9 @@ export default function RootLayout({ children }) {
     "/dashboard/admin-clinc-dashboard/receptionists",
     "/dashboard/admin-clinc-dashboard/receptionists/new",
     "/dashboard/admin-clinc-dashboard/patients",
+    "/dashboard/admin-clinc-dashboard/clinic",
+    "/dashboard/doctor-dashboard/appointments",
+    "/dashboard/doctor-dashboard/patients",
   ];
 
   const hideLayout = noLayoutPages.includes(pathname);

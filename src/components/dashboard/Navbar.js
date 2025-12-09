@@ -7,7 +7,6 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [badgeVisible, setBadgeVisible] = useState(true);
-
   const [notifications, setNotifications] = useState({
     expired: [],
     expiring: [],
@@ -16,7 +15,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Charger l'utilisateur depuis le localStorage
+  // Charger l'utilisateur depuis localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) setUser(JSON.parse(storedUser));
@@ -47,19 +46,34 @@ export default function Navbar() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications({
-          expired: Array.isArray(data.expired) ? data.expired : [],
-          expiring: Array.isArray(data.expiring) ? data.expiring : [],
-          pendingAdmins: Array.isArray(data.pendingAdmins)
-            ? data.pendingAdmins
-            : [],
-        });
-      } else {
-        // On ignore toutes les erreurs pour ne pas vider le localStorage
+      if (!res.ok) {
         console.warn("Notifications fetch error:", res.status);
+        return;
       }
+
+      const data = await res.json();
+      if (!data.success || !data.alerts) return;
+
+      let expired = [];
+      let expiring = [];
+      let pendingAdmins = [];
+
+      // Superadmin reçoit des tableaux
+      if (user?.role === "SUPERADMIN") {
+        expired = Array.isArray(data.alerts.expired) ? data.alerts.expired : [];
+        expiring = Array.isArray(data.alerts.expiring)
+          ? data.alerts.expiring
+          : [];
+        pendingAdmins = Array.isArray(data.alerts.pendingAdmins)
+          ? data.alerts.pendingAdmins
+          : [];
+      } else if (user?.role === "ADMIN_CLINIC") {
+        // AdminClinic reçoit un objet unique
+        if (data.alerts.type === "expired") expired = [data.alerts];
+        else if (data.alerts.type === "expiring") expiring = [data.alerts];
+      }
+
+      setNotifications({ expired, expiring, pendingAdmins });
     } catch (err) {
       console.error("Erreur fetch notifications:", err);
     } finally {
@@ -72,7 +86,7 @@ export default function Navbar() {
     fetchNotifications();
     const intervalId = setInterval(fetchNotifications, 10000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [user]);
 
   // Fermer dropdown en cliquant en dehors
   useEffect(() => {
@@ -100,35 +114,26 @@ export default function Navbar() {
   ];
   const bgColor = colors[userInitial.charCodeAt(0) % colors.length];
 
-  // Toggle et fetch immédiat quand on ouvre le dropdown
   const toggleNotifications = async () => {
     const opening = !menuOpen;
     setMenuOpen(opening);
     if (opening) await fetchNotifications();
+    if (opening) setBadgeVisible(false);
   };
 
   return (
     <>
       <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center bg-white/80 backdrop-blur-md shadow px-6 py-2">
-        {/* Logo */}
         <div className="flex items-center gap-3">
-          <img
-            src="/logo.svg"
-            alt="Logo"
-            className="h-15 w-auto" // augmenté de h-10 → h-12
-          />
+          <img src="/logo.svg" alt="Logo" className="h-15 w-auto" />
         </div>
 
-        {/* Right: Notifications + Profile */}
         <div className="flex items-center gap-4 relative" ref={dropdownRef}>
           {/* Notification button */}
           <button
             aria-label="Notifications"
             className="relative p-2 rounded-full hover:bg-gray-100 transition"
-            onClick={async () => {
-              toggleNotifications();
-              setBadgeVisible(false);
-            }}
+            onClick={toggleNotifications}
           >
             <BellIcon className="h-5 w-5 text-gray-600" />
             {totalNotifications > 0 && badgeVisible && (
@@ -138,26 +143,21 @@ export default function Navbar() {
             )}
           </button>
 
-          {/* Notifications dropdown */}
-          {/* Notifications dropdown - modern look */}
+          {/* Dropdown */}
           {menuOpen && (
             <div className="absolute top-full right-0 mt-2 w-80 max-w-[85vw] bg-white/90 backdrop-blur-md shadow-xl rounded-2xl overflow-hidden z-50 border border-gray-200">
-              {/* Header */}
               <div className="px-4 py-3 flex items-center justify-between border-b border-gray-200">
                 <span className="font-semibold text-gray-700 text-sm">
                   Notifications
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="text-gray-400 hover:text-gray-600 font-bold transition"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
+                <button
+                  className="text-gray-400 hover:text-gray-600 font-bold transition"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  ✕
+                </button>
               </div>
 
-              {/* Contenu notifications */}
               <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
                 {/* Bientôt expirées */}
                 {notifications.expiring.length > 0 && (
@@ -165,17 +165,19 @@ export default function Navbar() {
                     <h4 className="text-xs font-semibold text-yellow-700 uppercase mb-2">
                       Bientôt expirées
                     </h4>
-                    {notifications.expiring.map((c) => (
+                    {notifications.expiring.map((c, idx) => (
                       <div
-                        key={`e-${c.id}`}
+                        key={c.id || idx}
                         className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-yellow-50 transition flex justify-between items-start gap-2 cursor-pointer"
                       >
                         <div>
                           <div className="font-medium text-gray-800">
-                            {c.name}
+                            {c.name || "Votre clinique"}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Expire le {formatDate(c.subscriptionEnd)}
+                            {c.subscriptionEnd
+                              ? `Expire le ${formatDate(c.subscriptionEnd)}`
+                              : c.message}
                           </div>
                         </div>
                         <span className="text-xs font-semibold text-yellow-700">
@@ -192,17 +194,19 @@ export default function Navbar() {
                     <h4 className="text-xs font-semibold text-red-600 uppercase mb-2">
                       Expirées
                     </h4>
-                    {notifications.expired.map((c) => (
+                    {notifications.expired.map((c, idx) => (
                       <div
-                        key={`x-${c.id}`}
+                        key={c.id || idx}
                         className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-red-50 transition flex justify-between items-start gap-2 cursor-pointer"
                       >
                         <div>
                           <div className="font-medium text-gray-800">
-                            {c.name}
+                            {c.name || "Votre clinique"}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Expiré le {formatDate(c.subscriptionEnd)}
+                            {c.subscriptionEnd
+                              ? `Expiré le ${formatDate(c.subscriptionEnd)}`
+                              : c.message}
                           </div>
                         </div>
                         <span className="text-xs font-semibold text-red-600">
@@ -214,50 +218,48 @@ export default function Navbar() {
                 )}
 
                 {/* Nouveaux comptes non activés */}
-                {notifications.pendingAdmins.length > 0 && (
-                  <div className="px-4 py-3">
-                    <h4 className="text-xs font-semibold text-blue-700 uppercase mb-2">
-                      Nouveaux comptes non activés
-                    </h4>
-                    {notifications.pendingAdmins.map((c) => (
-                      <div
-                        key={`p-${c.id}`}
-                        className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-blue-50 transition flex justify-between items-start gap-2 cursor-pointer"
-                      >
-                        <div>
-                          <div className="font-medium text-gray-800">
-                            {c.name}
+                {user?.role === "SUPERADMIN" &&
+                  notifications.pendingAdmins.length > 0 && (
+                    <div className="px-4 py-3">
+                      <h4 className="text-xs font-semibold text-blue-700 uppercase mb-2">
+                        Nouveaux comptes non activés
+                      </h4>
+                      {notifications.pendingAdmins.map((c) => (
+                        <div
+                          key={c.id}
+                          className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-blue-50 transition flex justify-between items-start gap-2 cursor-pointer"
+                        >
+                          <div>
+                            <div className="font-medium text-gray-800">
+                              {c.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {c.adminClinic?.createdAt
+                                ? `Créé le ${formatDate(
+                                    c.adminClinic.createdAt
+                                  )}`
+                                : `Email: ${c.email}`}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {c.adminClinic?.createdAt
-                              ? `Créé le ${formatDate(c.adminClinic.createdAt)}`
-                              : `Email: ${c.email}`}
-                          </div>
+                          <span className="text-xs font-semibold text-blue-700">
+                            En attente
+                          </span>
                         </div>
-                        <span className="text-xs font-semibold text-blue-700">
-                          En attente
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
               </div>
             </div>
           )}
 
-          {/* Profile button */}
-          {/* Profile button */}
+          {/* Profile */}
           <div className="relative flex items-center gap-2">
             <button
               className={`flex items-center justify-center w-9 h-9 rounded-full text-white font-semibold ${bgColor} hover:brightness-110 transition`}
-              onClick={() => {
-                window.location.href = "/dashboard/profil";
-              }}
+              onClick={() => (window.location.href = "/dashboard/profil")}
             >
               {userInitial}
             </button>
-
-            {/* Afficher le nom complet */}
             {user?.name && (
               <span className="text-gray-700 font-medium text-sm hidden md:inline">
                 {user.name}
@@ -267,7 +269,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Padding pour ne pas cacher le contenu derrière la navbar */}
       <div className="pt-16"></div>
     </>
   );

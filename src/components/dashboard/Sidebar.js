@@ -9,7 +9,9 @@ import {
   BeakerIcon,
   BuildingLibraryIcon,
   UserGroupIcon,
+  CalendarDaysIcon, // pour Appointments
 } from "@heroicons/react/24/outline";
+
 const menus = {
   SUPERADMIN: [
     { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
@@ -27,10 +29,11 @@ const menus = {
   ],
 
   ADMIN_CLINIC: [
+    { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
     {
       name: "Patients",
       path: "/dashboard/admin-clinc-dashboard/patients",
-      icon: UserIcon, // tu peux changer l’icône si tu veux
+      icon: UserIcon,
     },
     {
       name: "Receptionists",
@@ -44,10 +47,23 @@ const menus = {
     },
     {
       name: "Clinic Settings",
-      path: "/dashboard/admin-clinc-dashboard/settings",
+      path: "/dashboard/admin-clinc-dashboard/clinic",
       icon: BuildingLibraryIcon,
     },
     { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
+  ],
+
+  DOCTOR: [
+    {
+      name: "Patients",
+      path: "/dashboard/doctor-dashboard/patients",
+      icon: UserIcon,
+    },
+    {
+      name: "Appointments",
+      path: "/dashboard/doctor-dashboard/appointments",
+      icon: CalendarDaysIcon,
+    },
   ],
 };
 
