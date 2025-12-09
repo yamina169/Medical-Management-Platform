@@ -72,20 +72,29 @@ async function verifyAdminAndGetClinic(req) {
 }
 export async function GET(req) {
   try {
+    // Vérifier le token et récupérer le payload de l'admin
     const payloadOrError = await verifyAdminClinic(req);
     if (!payloadOrError || payloadOrError?.status) return payloadOrError;
-    const payload = payloadOrError;
+
+    const tokenJWT = req.headers.get("authorization");
+    if (!tokenJWT) {
+      return NextResponse.json(
+        { success: false, error: "Authorization header missing" },
+        { status: 401 }
+      );
+    }
 
     const url = new URL(req.url);
     const searchParams = {
       search: url.searchParams.get("search") || "",
-      specialization: url.searchParams.get("specialization") || "", // <-- nouveau
+      specialization: url.searchParams.get("specialization") || "",
       page: parseInt(url.searchParams.get("page")) || 1,
       limit: parseInt(url.searchParams.get("limit")) || 10,
-      clinicId: payload.clinicId || payload.clinic?.id,
     };
 
-    const doctors = await getDoctors(searchParams);
+    // Passer le token en premier argument
+    const doctors = await getDoctors(tokenJWT, searchParams);
+
     return NextResponse.json({ success: true, data: doctors });
   } catch (err) {
     console.error("GET /doctors error:", err);
@@ -95,7 +104,6 @@ export async function GET(req) {
     );
   }
 }
-
 export async function POST(req) {
   try {
     const body = await req.json();

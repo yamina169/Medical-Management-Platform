@@ -8,21 +8,19 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  role      RoleEnum
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  superAdmin   SuperAdmin?
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  password     String
+  role         RoleEnum
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   adminClinic  AdminClinic?
   doctor       Doctor?
-  receptionist Receptionist?
   patient      Patient?
+  receptionist Receptionist?
+  superAdmin   SuperAdmin?
 }
-
 
 model SuperAdmin {
   id        Int      @id @default(autoincrement())
@@ -82,7 +80,7 @@ model Receptionist {
   appointments Appointment[] @relation("ReceptionistAppointments")
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
   user         User          @relation(fields: [userId], references: [id])
-  doctors      Doctor[]      @relation("DoctorReceptionist") // N:N
+  doctors      Doctor[]      @relation("DoctorReceptionist")
 }
 
 model Doctor {
@@ -90,7 +88,7 @@ model Doctor {
   userId           Int             @unique
   clinicId         Int
   specializationId Int?
-  isActive         Boolean         @default(true) // <-- nouveau champ
+  isActive         Boolean         @default(true)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   appointments     Appointment[]   @relation("DoctorAppointments")
@@ -98,8 +96,8 @@ model Doctor {
   specialization   Specialization? @relation(fields: [specializationId], references: [id])
   user             User            @relation(fields: [userId], references: [id])
   medicalRecords   MedicalRecord[]
-  patients         Patient[]       @relation("DoctorPatients") // N:N
-  receptionists    Receptionist[]  @relation("DoctorReceptionist") // N:N
+  patients         Patient[]       @relation("DoctorPatients")
+  receptionists    Receptionist[]  @relation("DoctorReceptionist")
 }
 
 model Patient {
@@ -108,12 +106,13 @@ model Patient {
   userId         Int             @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  isActive       Boolean        @default(true)
   appointments   Appointment[]
   invoices       Invoice[]
   medicalRecords MedicalRecord[]
   clinic         Clinic          @relation(fields: [clinicId], references: [id])
-  doctors        Doctor[]        @relation("DoctorPatients") // N:N
   user           User            @relation(fields: [userId], references: [id])
+  doctors        Doctor[]        @relation("DoctorPatients")
 }
 
 model Appointment {

@@ -13,45 +13,35 @@ import { sendEmail } from "@/lib/email";
 export async function registerReceptionist(payload, adminUserId) {
   if (!adminUserId) throw new Error("Admin userId is required");
 
-  const validation = registerSchema.safeParse(payload);
-  if (!validation.success) {
-    const errors = validation.error.errors
-      .map((e) => `${e.path.join(".")}: ${e.message}`)
-      .join(", ");
-    throw new Error(`Validation failed: ${errors}`);
-  }
+  const { name, email } = payload;
+
+  if (!name || !email) throw new Error("Name and email are required");
 
   // Get admin clinic
   const adminRecord = await prisma.adminClinic.findFirst({
     where: { userId: adminUserId },
     include: { clinic: true },
   });
+  if (!adminRecord || !adminRecord.clinic)
+    throw new Error("Admin clinic not found");
 
-  if (!adminRecord?.clinic?.id)
-    throw new Error("No clinic associated with this admin");
   const clinicId = adminRecord.clinic.id;
 
+  // Generate temp password
   const tempPassword = crypto.randomBytes(4).toString("hex");
-  const hashed = await bcrypt.hash(tempPassword, 10);
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-  let user;
-  try {
-    user = await prisma.user.create({
-      data: {
-        name: payload.name,
-        email: payload.email,
-        password: hashed,
-        role: "RECEPTIONIST",
-      },
-    });
-  } catch (err) {
-    const code = err?.code || err?.original?.code;
-    if (code === "P2002" && (err?.meta?.target || []).includes("email")) {
-      throw new Error("Email already in use");
-    }
-    throw err;
-  }
+  // Create user
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      role: "RECEPTIONIST",
+    },
+  });
 
+  // Create receptionist
   const receptionist = await prisma.receptionist.create({
     data: {
       userId: user.id,
@@ -61,11 +51,12 @@ export async function registerReceptionist(payload, adminUserId) {
     include: { user: true, clinic: true },
   });
 
+  // Send email
   await sendEmail({
-    to: payload.email,
+    to: email,
     subject: "Votre compte Réceptionniste - MedFlow",
-    text: `Bonjour ${payload.name},\nVotre compte réceptionniste a été créé pour la clinique ${receptionist.clinic.name}.\nEmail: ${payload.email}\nMot de passe temporaire: ${tempPassword}`,
-    html: `<p>Bonjour ${payload.name},</p><p>Votre compte réceptionniste a été créé pour la clinique <strong>${receptionist.clinic.name}</strong>.</p><ul><li><strong>Email:</strong> ${payload.email}</li><li><strong>Mot de passe temporaire:</strong> ${tempPassword}</li></ul><p>Merci, MedFlow</p>`,
+    text: `Bonjour ${name},\nVotre compte réceptionniste a été créé pour la clinique ${receptionist.clinic.name}.\nEmail: ${email}\nMot de passe temporaire: ${tempPassword}`,
+    html: `<p>Bonjour ${name},</p><p>Votre compte réceptionniste a été créé pour la clinique <strong>${receptionist.clinic.name}</strong>.</p><ul><li><strong>Email:</strong> ${email}</li><li><strong>Mot de passe temporaire:</strong> ${tempPassword}</li></ul><p>Merci, MedFlow</p>`,
   });
 
   return receptionist;

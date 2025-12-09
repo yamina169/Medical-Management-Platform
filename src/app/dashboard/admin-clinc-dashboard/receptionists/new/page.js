@@ -5,10 +5,9 @@ import { useState } from "react";
 export default function NewReceptionistPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(""); // <-- success message
+  const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,21 +23,19 @@ export default function NewReceptionistPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email }), // only name and email
       });
 
       const data = await res.json();
       if (data.error) {
         setError(data.error);
       } else {
-        // Clear form inputs
         setName("");
         setEmail("");
-        setPassword("");
-
-        // Show success message temporarily
-        setSuccess("Receptionist created successfully!");
-        setTimeout(() => setSuccess(""), 2000); // disappears after 2 sec
+        setSuccess(
+          "Receptionist created successfully! Password sent via email."
+        );
+        setTimeout(() => setSuccess(""), 2000);
       }
     } catch (err) {
       setError(err.message || "Error creating receptionist");
@@ -72,17 +69,6 @@ export default function NewReceptionistPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-            className="border p-2 w-full rounded"
-          />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
             required
             className="border p-2 w-full rounded"
           />

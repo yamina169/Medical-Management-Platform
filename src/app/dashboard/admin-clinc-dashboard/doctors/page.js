@@ -18,7 +18,7 @@ export default function DoctorsPage() {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        setMessage("Vous devez être connecté");
+        setError("Vous devez être connecté"); // utiliser setError car setMessage n'existe pas ici
         return;
       }
 
@@ -37,11 +37,11 @@ export default function DoctorsPage() {
 
       setSpecializations(list);
 
-      // Optionnel : sélectionner la première spécialité par défaut
-      if (list.length > 0) setSpecializationId(list[0].id);
+      // sélectionner la première spécialité par défaut
+      if (list.length > 0) setSelectedSpec(list[0].name); // <-- ici
     } catch (err) {
       console.error(err);
-      setMessage("Erreur serveur.");
+      setError("Erreur serveur.");
       setSpecializations([]);
     }
   };

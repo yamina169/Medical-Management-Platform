@@ -17,29 +17,39 @@ import { sendEmail } from "@/lib/email";
 export async function registerDoctor(payload, adminUserId) {
   if (!adminUserId) throw new Error("Admin userId is required from token");
 
-  // Validate payload using registerSchema
+  // ----------------------------
+  // Validation du payload
+  // ----------------------------
   const validation = registerSchema.safeParse(payload);
   if (!validation.success) {
-    const errors = validation.error.errors
+    const errorsArray = validation.error?.errors || [];
+    const errors = errorsArray
       .map((e) => `${e.path.join(".")}: ${e.message}`)
       .join(", ");
-    throw new Error(`Validation failed: ${errors}`);
+    throw new Error(`Validation failed: ${errors || "Payload invalide"}`);
   }
 
-  // Get admin clinic by userId
+  // ----------------------------
+  // Récupérer la clinique de l'admin
+  // ----------------------------
   const adminRecord = await prisma.adminClinic.findFirst({
     where: { userId: adminUserId },
     include: { clinic: true },
   });
   if (!adminRecord) throw new Error("Admin clinic not found");
+
   const clinicId = adminRecord.clinic?.id;
   if (!clinicId) throw new Error("No clinic associated with this admin");
 
-  // Generate temp password
+  // ----------------------------
+  // Générer un mot de passe temporaire
+  // ----------------------------
   const tempPassword = crypto.randomBytes(4).toString("hex");
   const hashed = await bcrypt.hash(tempPassword, 10);
 
-  // Create user (DOCTOR)
+  // ----------------------------
+  // Créer l'utilisateur DOCTOR
+  // ----------------------------
   let user;
   try {
     user = await prisma.user.create({
@@ -65,29 +75,36 @@ export async function registerDoctor(payload, adminUserId) {
     throw err;
   }
 
-  // Handle specialization
+  // ----------------------------
+  // Gestion de la spécialisation
+  // ----------------------------
   let specializationRecord;
-  if (payload.specializationId) {
-    specializationRecord = await prisma.specialization.findUnique({
-      where: { id: Number(payload.specializationId) },
-    });
-    if (!specializationRecord) {
-      await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
-      throw new Error("specializationId not found");
-    }
-  } else {
-    const name = String(payload.specialization).trim();
-    specializationRecord = await prisma.specialization.findUnique({
-      where: { name },
-    });
-    if (!specializationRecord) {
-      specializationRecord = await prisma.specialization.create({
-        data: { name },
+  try {
+    if (payload.specializationId) {
+      specializationRecord = await prisma.specialization.findUnique({
+        where: { id: Number(payload.specializationId) },
       });
+      if (!specializationRecord) throw new Error("specializationId not found");
+    } else {
+      const name = String(payload.specialization).trim();
+      specializationRecord = await prisma.specialization.findUnique({
+        where: { name },
+      });
+      if (!specializationRecord) {
+        specializationRecord = await prisma.specialization.create({
+          data: { name },
+        });
+      }
     }
+  } catch (err) {
+    // Supprimer user si spécialisation invalide
+    await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
+    throw err;
   }
 
-  // Create doctor record
+  // ----------------------------
+  // Créer le record Doctor
+  // ----------------------------
   const doctor = await prisma.doctor.create({
     data: {
       userId: user.id,
@@ -110,7 +127,9 @@ export async function registerDoctor(payload, adminUserId) {
     },
   });
 
-  // Send email
+  // ----------------------------
+  // Envoyer email
+  // ----------------------------
   await sendEmail({
     to: payload.email,
     subject: "Votre compte Médecin - MedFlow",
@@ -132,23 +151,42 @@ export async function registerDoctor(payload, adminUserId) {
 }
 
 /** Get doctors with optional search, specialization name, clinic filter and pagination */
-export async function getDoctors({
-  search = "",
-  page = 1,
-  limit = 10,
-  clinicId,
-  specialization = "",
-} = {}) {
+
+// tokenJWT doit être passé depuis l'API (req.headers.authorization)
+export async function getDoctors(
+  tokenJWT,
+  { search = "", page = 1, limit = 10, specialization = "" } = {}
+) {
+  if (!tokenJWT) throw new Error("Token is required");
+
+  // Décoder le token pour récupérer l'adminUserId
+  const token = tokenJWT.replace("Bearer ", "");
+  const payloadBase64 = token.split(".")[1];
+  const decodedPayload = JSON.parse(
+    Buffer.from(payloadBase64, "base64").toString()
+  );
+  const adminUserId = decodedPayload.id;
+  if (!adminUserId) throw new Error("Invalid token payload");
+
+  // Récupérer la clinicId de l'admin
+  const adminRecord = await prisma.adminClinic.findFirst({
+    where: { userId: adminUserId },
+    select: { clinicId: true },
+  });
+  if (!adminRecord) throw new Error("Admin clinic not found");
+  const clinicId = adminRecord.clinicId;
+
+  // Pagination
   const skip = (page - 1) * limit;
 
-  // normaliser les entrées
+  // Normalisation
   const q = (search || "").toString().trim();
   const spec = (specialization || "").toString().trim();
 
-  // construction du where (utilise user.is pour relation 1:1 et specialization.is pour relation 1:1)
+  // Construction du where pour Prisma
   const where = {
+    clinicId, // uniquement les docteurs de la même clinique
     isActive: true,
-    ...(clinicId && { clinicId }),
     ...(q && {
       OR: [
         { user: { is: { name: { contains: q, mode: "insensitive" } } } },
@@ -164,16 +202,13 @@ export async function getDoctors({
 
   const data = await prisma.doctor.findMany({
     where,
-    include: {
-      user: true,
-      specialization: true,
-      clinic: true,
-    },
+    include: { user: true, specialization: true, clinic: true },
     skip,
     take: limit,
     orderBy: { createdAt: "desc" },
   });
 
+  // Mapper pour retourner les infos utiles
   const mappedData = data.map((doc) => ({
     id: doc.id,
     userId: doc.userId,
