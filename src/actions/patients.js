@@ -63,40 +63,41 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
   return patient;
 }
 
-/** Get patients with optional search, clinic filter, and pagination */
-
 /**
- * Récupère les patients actifs pour le clinic admin connecté.
- * @param {Object} params
- * @param {string} params.search
- * @param {number} params.page
- * @param {number} params.limit
- * @param {string} params.adminUserId - id du user connecté (clinic admin)
+ * Get patients filtered by clinic of the admin
+ * @param {string} tokenJWT - "Bearer <token>"
+ * @param {Object} options - search, page, limit
  */
-export async function getPatients({
-  search = "",
-  page = 1,
-  limit = 10,
-  adminUserId,
-}) {
-  const skip = (page - 1) * limit;
-  const q = (search || "").trim();
+export async function getPatients(
+  tokenJWT,
+  { search = "", page = 1, limit = 10 } = {}
+) {
+  if (!tokenJWT) throw new Error("Token is required");
 
-  // Récupérer le clinicId du clinic admin
-  const adminClinic = await prisma.adminClinic.findUnique({
+  // Décoder le token pour récupérer adminUserId
+  const token = tokenJWT.replace("Bearer ", "");
+  const payloadBase64 = token.split(".")[1];
+  const decodedPayload = JSON.parse(
+    Buffer.from(payloadBase64, "base64").toString()
+  );
+  const adminUserId = decodedPayload.id;
+  if (!adminUserId) throw new Error("Invalid token payload");
+
+  // Récupérer la clinicId de l'admin
+  const adminRecord = await prisma.adminClinic.findFirst({
     where: { userId: adminUserId },
     select: { clinicId: true },
   });
+  if (!adminRecord) throw new Error("Admin clinic not found");
+  const clinicId = adminRecord.clinicId;
 
-  if (!adminClinic) {
-    return { data: [], total: 0, page, limit };
-  }
+  // Pagination
+  const skip = (page - 1) * limit;
+  const q = (search || "").trim();
 
-  const clinicId = adminClinic.clinicId;
-
+  // Filtrage
   const where = {
-    clinicId,
-    isActive: true, // uniquement les patients actifs
+    clinicId, // uniquement les patients de la même clinique
     ...(q && {
       OR: [
         { user: { is: { name: { contains: q, mode: "insensitive" } } } },
@@ -109,7 +110,7 @@ export async function getPatients({
 
   const data = await prisma.patient.findMany({
     where,
-    include: { user: true }, // pas besoin de récupérer la clinique ici
+    include: { user: true, clinic: true },
     skip,
     take: limit,
     orderBy: { createdAt: "desc" },

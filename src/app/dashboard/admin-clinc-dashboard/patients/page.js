@@ -24,13 +24,16 @@ export default function PatientsPage() {
       );
       const data = await res.json();
       if (data.success) {
-        setPatients(data.data.data);
-        setTotal(data.data.total);
+        setPatients(data.data);
+        setTotal(data.total);
       } else {
         setPatients([]);
+        setTotal(0);
       }
     } catch (err) {
       console.error("Fetch patients error:", err);
+      setPatients([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -39,27 +42,6 @@ export default function PatientsPage() {
   useEffect(() => {
     fetchPatients();
   }, [search, page]);
-
-  const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this patient?")) return;
-
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/patients", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ id }),
-      });
-      const data = await res.json();
-      if (data.success) fetchPatients();
-      else alert(data.error);
-    } catch (err) {
-      console.error("Delete patient error:", err);
-    }
-  };
 
   const totalPages = Math.ceil(total / limit);
 
@@ -92,7 +74,7 @@ export default function PatientsPage() {
           <tbody>
             {patients.length === 0 ? (
               <tr>
-                <td colSpan="5" className="text-center p-2">
+                <td colSpan="4" className="text-center p-2">
                   No patients found.
                 </td>
               </tr>
@@ -106,14 +88,6 @@ export default function PatientsPage() {
                   <td className="border px-2 py-1">{p.email}</td>
                   <td className="border px-2 py-1">
                     {new Date(p.createdAt).toLocaleString()}
-                  </td>
-                  <td className="border px-2 py-1">
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
-                    >
-                      Delete
-                    </button>
                   </td>
                 </tr>
               ))

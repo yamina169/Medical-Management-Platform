@@ -13,6 +13,7 @@ export default function ReceptionistsPage() {
 
   const fetchReceptionists = async () => {
     setLoading(true);
+    setError("");
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams({
@@ -25,10 +26,16 @@ export default function ReceptionistsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setReceptionists(data.data.data);
-        setTotal(data.data.total);
-      } else setError(data.error || "Failed to fetch receptionists");
+        setReceptionists(data.data || []);
+        setTotal(data.total || 0);
+      } else {
+        setReceptionists([]);
+        setTotal(0);
+        setError(data.error || "Failed to fetch receptionists");
+      }
     } catch (err) {
+      setReceptionists([]);
+      setTotal(0);
       setError(err.message || "Failed to fetch receptionists");
     } finally {
       setLoading(false);
@@ -49,7 +56,9 @@ export default function ReceptionistsPage() {
       });
       const data = await res.json();
       if (data.success) {
+        // Supprime le receptionist de l'état local pour mise à jour immédiate
         setReceptionists(receptionists.filter((r) => r.id !== id));
+        setTotal((t) => t - 1);
         alert("Receptionist deleted successfully");
       } else {
         alert(data.error || "Failed to delete receptionist");
@@ -77,7 +86,6 @@ export default function ReceptionistsPage() {
         </a>
       </div>
 
-      {/* Search/filter */}
       <div className="mb-4">
         <input
           type="text"
@@ -104,22 +112,23 @@ export default function ReceptionistsPage() {
               </tr>
             </thead>
             <tbody>
-              {receptionists.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="border px-4 py-2">{r.id}</td>
-                  <td className="border px-4 py-2">{r.name}</td>
-                  <td className="border px-4 py-2">{r.email}</td>
-                  <td className="border px-4 py-2">
-                    <button
-                      onClick={() => deleteReceptionist(r.id)}
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {receptionists.length === 0 && (
+              {receptionists.length > 0 ? (
+                receptionists.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="border px-4 py-2">{r.id}</td>
+                    <td className="border px-4 py-2">{r.name}</td>
+                    <td className="border px-4 py-2">{r.email}</td>
+                    <td className="border px-4 py-2">
+                      <button
+                        onClick={() => deleteReceptionist(r.id)}
+                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan="4" className="text-center p-4">
                     No receptionists found
@@ -129,26 +138,27 @@ export default function ReceptionistsPage() {
             </tbody>
           </table>
 
-          {/* Pagination */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page === 1}
-              className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-              disabled={page === totalPages}
-              className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                disabled={page === totalPages}
+                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

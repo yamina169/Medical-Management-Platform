@@ -17,6 +17,12 @@ export async function registerReceptionist(payload, adminUserId) {
 
   if (!name || !email) throw new Error("Name and email are required");
 
+  // Check if email already exists
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    throw new Error("Email already in use");
+  }
+
   // Get admin clinic
   const adminRecord = await prisma.adminClinic.findFirst({
     where: { userId: adminUserId },
@@ -62,6 +68,10 @@ export async function registerReceptionist(payload, adminUserId) {
   return receptionist;
 }
 
+/**
+ * Get receptionists filtered by clinicId (admin's clinic), with search and pagination
+ * @param {Object} params - { search, page, limit, clinicId }
+ */
 export async function getReceptionists({
   search = "",
   page = 1,
@@ -69,10 +79,11 @@ export async function getReceptionists({
   clinicId,
 } = {}) {
   const skip = (page - 1) * limit;
-  const q = search.trim();
+  const q = (search || "").trim();
 
+  // Construction du filtre
   const where = {
-    ...(clinicId && { clinicId }),
+    ...(clinicId && { clinicId }), // seulement ceux de la même clinique
     isActive: true,
     ...(q && {
       OR: [
@@ -92,6 +103,7 @@ export async function getReceptionists({
     orderBy: { createdAt: "desc" },
   });
 
+  // Mapper pour ne retourner que les champs utiles
   const mapped = data.map((r) => ({
     id: r.id,
     userId: r.userId,

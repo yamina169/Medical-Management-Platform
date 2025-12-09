@@ -7,51 +7,73 @@ import {
   updateReceptionist,
   deleteReceptionist,
 } from "@/actions/receptionists";
+import prisma from "@/lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-
-async function verifyAdminClinic(req) {
+async function verifyToken(req) {
   const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer "))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!authHeader?.startsWith("Bearer ")) return null;
 
   const token = authHeader.split(" ")[1];
-
-  let payload;
   try {
-    payload = jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET);
   } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    return null;
   }
-
-  if (payload.role !== "ADMIN_CLINIC")
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  return payload;
 }
 
+// Récupérer clinicId de l'admin
+async function getAdminClinicId(adminUserId) {
+  const adminRecord = await prisma.adminClinic.findFirst({
+    where: { userId: adminUserId },
+    select: { clinicId: true },
+  });
+  if (!adminRecord) throw new Error("Admin clinic not found");
+  return adminRecord.clinicId;
+}
+
+// GET /api/receptionists
 export async function GET(req) {
   try {
-    const payload = await verifyAdminClinic(req);
-    if (!payload || payload?.status) return payload;
+    const payload = await verifyToken(req);
+    if (!payload) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
+    const adminUserId = payload.id;
+
+    // Récupérer la clinicId du clinic admin
+    const clinicId = await getAdminClinicId(adminUserId);
+
+    // Récupérer les query params
     const url = new URL(req.url);
-    const params = {
-      search: url.searchParams.get("search") || "",
-      page: parseInt(url.searchParams.get("page")) || 1,
-      limit: parseInt(url.searchParams.get("limit")) || 10,
-      clinicId: payload.clinicId || payload.clinic?.id,
-    };
+    const search = url.searchParams.get("search") || "";
+    const page = Number(url.searchParams.get("page") || 1);
+    const limit = Number(url.searchParams.get("limit") || 10);
 
-    const receptionists = await getReceptionists(params);
-    return NextResponse.json({ success: true, data: receptionists });
-  } catch (err) {
+    // Récupérer les réceptionnistes filtrés par clinicId
+    const receptionists = await getReceptionists({
+      search,
+      page,
+      limit,
+      clinicId,
+    });
+
     return NextResponse.json(
-      { success: false, error: err.message },
+      { success: true, ...receptionists },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error("GET /api/receptionists error:", err);
+    return NextResponse.json(
+      { success: false, error: err.message || "Server error" },
       { status: 500 }
     );
   }
 }
-
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -96,12 +118,32 @@ export async function PUT(req) {
       { status: 400 }
     );
   }
+} // Fonction pour vérifier que l'utilisateur est admin de la clinique
+async function verifyAdminClinic(req) {
+  const payload = await verifyToken(req);
+  if (!payload) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const clinicId = await getAdminClinicId(payload.id);
+    return { adminId: payload.id, clinicId };
+  } catch (err) {
+    return NextResponse.json(
+      { success: false, error: err.message },
+      { status: 403 }
+    );
+  }
 }
 
+// Exemple pour DELETE
 export async function DELETE(req) {
   try {
     const payload = await verifyAdminClinic(req);
-    if (!payload || payload?.status) return payload;
+    if (!payload.adminId) return payload; // Si payload contient déjà la réponse NextResponse
 
     const body = await req.json();
     if (!body.id)

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
 import {
   getPatients,
   registerPatient,
@@ -8,73 +9,106 @@ import {
 } from "@/actions/patients";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-
-async function verifyToken(req) {
+async function verifyAdminClinic(req) {
   const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const token = authHeader.split(" ")[1];
   try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!["ADMIN_CLINIC"].includes(decoded.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const adminRecord = await prisma.adminClinic.findFirst({
+      where: { userId: decoded.id },
+      select: { clinicId: true },
+    });
+
+    if (!adminRecord) {
+      return NextResponse.json(
+        { error: "Admin clinic not found" },
+        { status: 404 }
+      );
+    }
+
+    return { adminUserId: decoded.id, clinicId: adminRecord.clinicId };
+  } catch (err) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 }
+
+// GET /api/patients
 export async function GET(req) {
   try {
-    // 1️⃣ Récupérer le token depuis le header Authorization
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
-    }
+    // 1️⃣ Vérifier le token et récupérer adminUserId + clinicId
+    const payloadOrResponse = await verifyAdminClinic(req);
+    if (payloadOrResponse instanceof NextResponse) return payloadOrResponse;
 
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-      });
-    }
+    const { adminUserId, clinicId } = payloadOrResponse;
 
-    // 2️⃣ Décoder le token pour obtenir le userId
-    const secret = process.env.JWT_SECRET; // mettre la clé secrète de ton JWT
-    const decoded = jwt.verify(token, secret);
-    const adminUserId = decoded.id;
-
-    // 3️⃣ Récupérer les query params
+    // 2️⃣ Récupérer les query params
     const url = new URL(req.url);
     const search = url.searchParams.get("search") || "";
     const page = Number(url.searchParams.get("page") || 1);
     const limit = Number(url.searchParams.get("limit") || 10);
 
-    // 4️⃣ Appeler la fonction getPatients en filtrant par la clinique de l'admin
-    const patients = await getPatients({ search, page, limit, adminUserId });
+    // 3️⃣ Filtrage par clinicId et recherche
+    const skip = (page - 1) * limit;
+    const q = search.trim();
 
-    // 5️⃣ Retourner la réponse
-    return new Response(JSON.stringify({ success: true, ...patients }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    const where = {
+      clinicId,
+      ...(q && {
+        OR: [
+          { user: { is: { name: { contains: q, mode: "insensitive" } } } },
+          { user: { is: { email: { contains: q, mode: "insensitive" } } } },
+        ],
+      }),
+    };
+
+    const total = await prisma.patient.count({ where });
+    const data = await prisma.patient.findMany({
+      where,
+      include: { user: true },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
     });
-  } catch (error) {
-    console.error("GET /api/patients error:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
+
+    const mapped = data.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      clinicId: p.clinicId,
+      name: p.user?.name || null,
+      email: p.user?.email || null,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      data: mapped,
+      total,
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error("GET /api/patients error:", err);
+    return NextResponse.json(
+      { success: false, error: err.message || "Server error" },
+      { status: 500 }
     );
   }
 }
 export async function POST(req) {
-  const payload = await verifyToken(req);
+  const payload = await verifyRole(req);
   if (!payload)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role)) {
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = await req.json();
   const patient = await registerPatient(body, payload.id, payload.role);
@@ -82,13 +116,11 @@ export async function POST(req) {
 }
 
 export async function PUT(req) {
-  const payload = await verifyToken(req);
+  const payload = await verifyRole(req);
   if (!payload)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role)) {
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = await req.json();
   const { id, ...data } = body;
@@ -103,13 +135,11 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
-  const payload = await verifyToken(req);
+  const payload = await verifyRole(req);
   if (!payload)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role)) {
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = await req.json();
   if (!body.id)
