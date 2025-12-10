@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState([]);
@@ -9,7 +10,9 @@ export default function PatientsPage() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
+  // Récupération des patients
   const fetchPatients = async () => {
     setLoading(true);
     try {
@@ -45,6 +48,11 @@ export default function PatientsPage() {
 
   const totalPages = Math.ceil(total / limit);
 
+  // Redirige vers la page du record médical du patient
+  const handleViewRecord = (patientId) => {
+    router.push(`/dashboard/doctor-dashboard/medical-record/${patientId}`);
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Patients</h1>
@@ -69,7 +77,7 @@ export default function PatientsPage() {
               <th className="border px-2 py-1">Name</th>
               <th className="border px-2 py-1">Email</th>
               <th className="border px-2 py-1">Phone</th>
-              <th className="border px-2 py-1">Created At</th>
+              <th className="border px-2 py-1">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -89,7 +97,12 @@ export default function PatientsPage() {
                   <td className="border px-2 py-1">{p.email}</td>
                   <td className="border px-2 py-1">{p.phoneNumber}</td>
                   <td className="border px-2 py-1">
-                    {new Date(p.createdAt).toLocaleString()}
+                    <button
+                      onClick={() => handleViewRecord(p.id)}
+                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                    >
+                      View Record
+                    </button>
                   </td>
                 </tr>
               ))

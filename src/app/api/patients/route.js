@@ -9,7 +9,9 @@ import {
 } from "@/actions/patients";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-async function verifyAdminClinic(req) {
+
+// Vérifie le token et récupère userId, role et clinicId
+async function verifyUser(req) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,35 +20,62 @@ async function verifyAdminClinic(req) {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (!["ADMIN_CLINIC"].includes(decoded.role)) {
+    const { id: userId, role } = decoded;
+
+    if (!["ADMIN_CLINIC", "DOCTOR", "RECEPTIONIST"].includes(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const adminRecord = await prisma.adminClinic.findFirst({
-      where: { userId: decoded.id },
-      select: { clinicId: true },
-    });
+    let clinicId = null;
 
-    if (!adminRecord) {
-      return NextResponse.json(
-        { error: "Admin clinic not found" },
-        { status: 404 }
-      );
+    if (role === "ADMIN_CLINIC") {
+      const record = await prisma.adminClinic.findFirst({
+        where: { userId },
+        select: { clinicId: true },
+      });
+      if (!record)
+        return NextResponse.json(
+          { error: "Admin clinic not found" },
+          { status: 404 }
+        );
+      clinicId = record.clinicId;
+    } else if (role === "DOCTOR") {
+      const record = await prisma.doctor.findFirst({
+        where: { userId },
+        select: { clinicId: true },
+      });
+      if (!record)
+        return NextResponse.json(
+          { error: "Doctor not found" },
+          { status: 404 }
+        );
+      clinicId = record.clinicId;
+    } else if (role === "RECEPTIONIST") {
+      const record = await prisma.receptionist.findFirst({
+        where: { userId },
+        select: { clinicId: true },
+      });
+      if (!record)
+        return NextResponse.json(
+          { error: "Receptionist not found" },
+          { status: 404 }
+        );
+      clinicId = record.clinicId;
     }
 
-    return { adminUserId: decoded.id, clinicId: adminRecord.clinicId };
+    return { userId, role, clinicId };
   } catch (err) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 }
+
 // GET /api/patients
 export async function GET(req) {
   try {
-    // Vérification du token + récupération adminUserId et clinicId
-    const payloadOrResponse = await verifyAdminClinic(req);
+    const payloadOrResponse = await verifyUser(req);
     if (payloadOrResponse instanceof NextResponse) return payloadOrResponse;
 
-    const { adminUserId } = payloadOrResponse;
+    const { userId, role } = payloadOrResponse;
 
     // Récupérer les query params
     const url = new URL(req.url);
@@ -54,7 +83,7 @@ export async function GET(req) {
     const page = Number(url.searchParams.get("page") || 1);
     const limit = Number(url.searchParams.get("limit") || 10);
 
-    // Utiliser directement la fonction getPatients
+    // Utiliser la fonction getPatients
     const result = await getPatients(
       `Bearer ${req.headers.get("authorization")?.split(" ")[1]}`,
       {
@@ -64,10 +93,7 @@ export async function GET(req) {
       }
     );
 
-    return NextResponse.json({
-      success: true,
-      ...result,
-    });
+    return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error("GET /api/patients error:", err);
     return NextResponse.json(
@@ -77,23 +103,26 @@ export async function GET(req) {
   }
 }
 
+// Les autres routes POST, PUT, DELETE peuvent réutiliser verifyUser
 export async function POST(req) {
-  const payload = await verifyRole(req);
-  if (!payload)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
+  const payload = await verifyUser(req);
+  if (payload instanceof NextResponse) return payload;
+
+  const { role, userId } = payload;
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const patient = await registerPatient(body, payload.id, payload.role);
+  const patient = await registerPatient(body, userId, role);
   return NextResponse.json({ success: true, data: patient });
 }
 
 export async function PUT(req) {
-  const payload = await verifyRole(req);
-  if (!payload)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
+  const payload = await verifyUser(req);
+  if (payload instanceof NextResponse) return payload;
+
+  const { role } = payload;
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
@@ -109,10 +138,11 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
-  const payload = await verifyRole(req);
-  if (!payload)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(payload.role))
+  const payload = await verifyUser(req);
+  if (payload instanceof NextResponse) return payload;
+
+  const { role } = payload;
+  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();

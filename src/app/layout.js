@@ -7,8 +7,8 @@ import { usePathname } from "next/navigation";
 export default function RootLayout({ children }) {
   const pathname = usePathname();
 
-  // Pages où on ne veut pas afficher Navbar et Footer
-  const noLayoutPages = [
+  // Pages exactes où on ne veut pas afficher Navbar et Footer
+  const noLayoutPagesExact = [
     "/login",
     "/register",
     "/reset-password",
@@ -26,7 +26,12 @@ export default function RootLayout({ children }) {
     "/dashboard/doctor-dashboard/patients",
   ];
 
-  const hideLayout = noLayoutPages.includes(pathname);
+  // Pages dynamiques où on ne veut pas afficher Navbar et Footer
+  const noLayoutPagesDynamic = ["/dashboard/doctor-dashboard/medical-record/"];
+
+  const hideLayout =
+    noLayoutPagesExact.includes(pathname) ||
+    noLayoutPagesDynamic.some((p) => pathname.startsWith(p));
 
   return (
     <html lang="fr">

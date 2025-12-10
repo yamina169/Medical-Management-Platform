@@ -95,7 +95,6 @@ model Doctor {
   clinic           Clinic          @relation(fields: [clinicId], references: [id])
   specialization   Specialization? @relation(fields: [specializationId], references: [id])
   user             User            @relation(fields: [userId], references: [id])
-  medicalRecords   MedicalRecord[]
   patients         Patient[]       @relation("DoctorPatients")
   receptionists    Receptionist[]  @relation("DoctorReceptionist")
 }
@@ -135,12 +134,10 @@ model Appointment {
 model MedicalRecord {
   id            Int      @id @default(autoincrement())
   patientId     Int
-  doctorId      Int
   description   String
   prescriptions Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  doctor        Doctor   @relation(fields: [doctorId], references: [id])
   patient       Patient  @relation(fields: [patientId], references: [id])
 }
 

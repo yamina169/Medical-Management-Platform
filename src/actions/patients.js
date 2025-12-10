@@ -1,20 +1,23 @@
-"use server";
+/** Register a new patient linked to a clinic */
 
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { sendEmail } from "@/lib/email";
 
-/** Register a new patient linked to a clinic */
+/**
+ * Register a new patient linked to a clinic
+ * Crée automatiquement un dossier médical vide pour le patient
+ */
 export async function registerPatient(payload, creatorUserId, creatorRole) {
   if (!creatorUserId) throw new Error("Creator userId is required");
 
-  const { name, email } = payload;
+  const { name, email, phoneNumber } = payload;
   if (!name || !email) throw new Error("Name and email are required");
 
   let clinicId;
 
-  // Determine clinicId depending on creator role
+  // Déterminer le clinicId selon le rôle du créateur
   if (creatorRole === "ADMIN_CLINIC") {
     const admin = await prisma.adminClinic.findUnique({
       where: { userId: creatorUserId },
@@ -37,36 +40,57 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
     throw new Error("Unauthorized role to create patient");
   }
 
-  // Generate temp password
+  // Générer un mot de passe temporaire
   const tempPassword = crypto.randomBytes(4).toString("hex");
-  const hashed = await bcrypt.hash(tempPassword, 10);
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-  // Create user
+  // Créer l'utilisateur
   const user = await prisma.user.create({
-    data: { name, email, password: hashed, role: "PATIENT" },
+    data: {
+      name,
+      email,
+      password: hashedPassword,
+      role: "PATIENT",
+    },
   });
 
-  // Create patient
-  // Création du patient
+  // Créer le patient
   const patient = await prisma.patient.create({
     data: {
       userId: user.id,
       clinicId,
-      phoneNumber: payload.phoneNumber, // valeur par défaut si non fournie
+      phoneNumber: phoneNumber || null,
     },
-    include: { user: true, clinic: true },
+    include: { clinic: true, user: true },
   });
 
-  // Send email with temp password
+  // Créer automatiquement le dossier médical
+  await prisma.medicalRecord.create({
+    data: {
+      patientId: patient.id,
+      description: "",
+      prescriptions: { medicaments: [] },
+      doctorId: null, // peut être assigné plus tard
+    },
+  });
+
+  // Envoyer un email avec le mot de passe temporaire
   await sendEmail({
     to: email,
     subject: "Votre compte Patient - MedFlow",
     text: `Bonjour ${name},\nVotre compte patient a été créé pour la clinique ${patient.clinic.name}.\nEmail: ${email}\nMot de passe temporaire: ${tempPassword}`,
-    html: `<p>Bonjour ${name},</p><p>Votre compte patient a été créé pour la clinique <strong>${patient.clinic.name}</strong>.</p><ul><li><strong>Email:</strong> ${email}</li><li><strong>Mot de passe temporaire:</strong> ${tempPassword}</li></ul><p>Merci, MedFlow</p>`,
+    html: `<p>Bonjour ${name},</p>
+           <p>Votre compte patient a été créé pour la clinique <strong>${patient.clinic.name}</strong>.</p>
+           <ul>
+             <li><strong>Email:</strong> ${email}</li>
+             <li><strong>Mot de passe temporaire:</strong> ${tempPassword}</li>
+           </ul>
+           <p>Merci, MedFlow</p>`,
   });
 
   return patient;
 }
+
 export async function getPatients(
   tokenJWT,
   { search = "", page = 1, limit = 10 } = {}
@@ -78,15 +102,39 @@ export async function getPatients(
   const decodedPayload = JSON.parse(
     Buffer.from(payloadBase64, "base64").toString()
   );
-  const adminUserId = decodedPayload.id;
-  if (!adminUserId) throw new Error("Invalid token payload");
 
-  const adminRecord = await prisma.adminClinic.findFirst({
-    where: { userId: adminUserId },
-    select: { clinicId: true },
-  });
-  if (!adminRecord) throw new Error("Admin clinic not found");
-  const clinicId = adminRecord.clinicId;
+  const userId = decodedPayload.id;
+  const role = decodedPayload.role;
+
+  if (!userId || !role) throw new Error("Invalid token payload");
+
+  // Récupérer le clinicId selon le rôle
+  let clinicId = null;
+
+  if (role === "ADMIN_CLINIC") {
+    const adminRecord = await prisma.adminClinic.findFirst({
+      where: { userId },
+      select: { clinicId: true },
+    });
+    if (!adminRecord) throw new Error("Admin clinic not found");
+    clinicId = adminRecord.clinicId;
+  } else if (role === "DOCTOR") {
+    const doctorRecord = await prisma.doctor.findFirst({
+      where: { userId },
+      select: { clinicId: true },
+    });
+    if (!doctorRecord) throw new Error("Doctor not found");
+    clinicId = doctorRecord.clinicId;
+  } else if (role === "RECEPTIONIST") {
+    const receptionistRecord = await prisma.receptionist.findFirst({
+      where: { userId },
+      select: { clinicId: true },
+    });
+    if (!receptionistRecord) throw new Error("Receptionist not found");
+    clinicId = receptionistRecord.clinicId;
+  } else {
+    throw new Error("Role not authorized to fetch patients");
+  }
 
   const skip = (page - 1) * limit;
   const q = search.trim();
@@ -105,7 +153,6 @@ export async function getPatients(
 
   const total = await prisma.patient.count({ where });
 
-  // ✅ Utiliser select sur le niveau patient pour inclure phoneNumber ET user
   const data = await prisma.patient.findMany({
     where,
     skip,
@@ -115,7 +162,7 @@ export async function getPatients(
       id: true,
       userId: true,
       clinicId: true,
-      phoneNumber: true, // récupère correctement le numéro
+      phoneNumber: true,
       createdAt: true,
       updatedAt: true,
       user: {
