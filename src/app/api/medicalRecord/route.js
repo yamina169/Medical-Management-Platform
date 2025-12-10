@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import {
   getMedicalRecordByPatient,
-  createMedicalRecord,
   updateMedicalRecord,
-  deleteMedicalRecord,
 } from "@/actions/medicalRecord";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -50,16 +48,6 @@ export async function GET(req) {
   return NextResponse.json({ success: true, data: record });
 }
 
-export async function POST(req) {
-  const doctor = await verifyDoctor(req);
-  if (!doctor)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const body = await req.json();
-  const record = await createMedicalRecord(doctor.id, body);
-  return NextResponse.json({ success: true, data: record });
-}
-
 export async function PUT(req) {
   try {
     const body = await req.json();
@@ -78,17 +66,4 @@ export async function PUT(req) {
       { status: 500 }
     );
   }
-}
-
-export async function DELETE(req) {
-  const doctor = await verifyDoctor(req);
-  if (!doctor)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const body = await req.json();
-  if (!body.id)
-    return NextResponse.json({ error: "Record id required" }, { status: 400 });
-
-  const deleted = await deleteMedicalRecord(doctor.id, body.id);
-  return NextResponse.json({ success: true, data: deleted });
 }

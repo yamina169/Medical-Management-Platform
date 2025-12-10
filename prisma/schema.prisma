@@ -179,6 +179,7 @@ enum AppointmentStatus {
   SCHEDULED
   CANCELLED
   COMPLETED
+  IN_PROGRESS
 }
 
 enum InvoiceStatus {

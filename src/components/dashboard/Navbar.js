@@ -58,7 +58,6 @@ export default function Navbar() {
       let expiring = [];
       let pendingAdmins = [];
 
-      // Superadmin reçoit des tableaux
       if (user?.role === "SUPERADMIN") {
         expired = Array.isArray(data.alerts.expired) ? data.alerts.expired : [];
         expiring = Array.isArray(data.alerts.expiring)
@@ -68,7 +67,6 @@ export default function Navbar() {
           ? data.alerts.pendingAdmins
           : [];
       } else if (user?.role === "ADMIN_CLINIC") {
-        // AdminClinic reçoit un objet unique
         if (data.alerts.type === "expired") expired = [data.alerts];
         else if (data.alerts.type === "expiring") expiring = [data.alerts];
       }
@@ -99,10 +97,14 @@ export default function Navbar() {
     return () => document.removeEventListener("click", onClickOutside);
   }, []);
 
+  // Ajouter 1 notification statique si role DOCTOR
+  const staticDoctorNotifications = user?.role === "DOCTOR" ? [1] : [];
+
   const totalNotifications =
     notifications.expired.length +
     notifications.expiring.length +
-    (notifications.pendingAdmins?.length || 0);
+    (notifications.pendingAdmins?.length || 0) +
+    staticDoctorNotifications.length;
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : "U";
   const colors = [
@@ -159,6 +161,32 @@ export default function Navbar() {
               </div>
 
               <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                {/* Notification statique pour DOCTOR */}
+                {(user?.role === "DOCTOR" || user?.role === "RECEPTIONIST") && (
+                  <div className="px-4 py-3">
+                    <h4 className="text-xs font-semibold text-green-700 uppercase mb-2">
+                      Message du jour
+                    </h4>
+                    <div className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-green-50 transition flex justify-between items-start gap-2 cursor-pointer">
+                      <div>
+                        <div className="font-medium text-gray-800">
+                          {user?.role === "DOCTOR"
+                            ? "Bonjour Docteur !"
+                            : "Bonjour Réceptionniste !"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {user?.role === "DOCTOR"
+                            ? "Vérifiez vos rendez-vous d'aujourd'hui."
+                            : "Vérifiez les rendez-vous du jour."}
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-green-700">
+                        Info
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Bientôt expirées */}
                 {notifications.expiring.length > 0 && (
                   <div className="px-4 py-3">
@@ -217,7 +245,7 @@ export default function Navbar() {
                   </div>
                 )}
 
-                {/* Nouveaux comptes non activés */}
+                {/* Nouveaux comptes non activés pour SUPERADMIN */}
                 {user?.role === "SUPERADMIN" &&
                   notifications.pendingAdmins.length > 0 && (
                     <div className="px-4 py-3">

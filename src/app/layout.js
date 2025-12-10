@@ -24,10 +24,20 @@ export default function RootLayout({ children }) {
     "/dashboard/admin-clinc-dashboard/clinic",
     "/dashboard/doctor-dashboard/appointments",
     "/dashboard/doctor-dashboard/patients",
+    // Receptionist
+    "/dashboard/receptionist-dashboard/patients",
+    "/dashboard/receptionist-dashboard/appointments",
+    "/dashboard/receptionist-dashboard/patients/new",
   ];
 
   // Pages dynamiques où on ne veut pas afficher Navbar et Footer
-  const noLayoutPagesDynamic = ["/dashboard/doctor-dashboard/medical-record/"];
+  const noLayoutPagesDynamic = [
+    "/dashboard/doctor-dashboard/medical-record/",
+    "/dashboard/doctor-dashboard/appointments/",
+    // Receptionist si pages dynamiques
+    "/dashboard/receptionist-dashboard/patients/",
+    "/dashboard/receptionist-dashboard/appointments/",
+  ];
 
   const hideLayout =
     noLayoutPagesExact.includes(pathname) ||

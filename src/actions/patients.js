@@ -219,20 +219,32 @@ export async function updatePatient(id, data) {
 }
 
 /** Delete (deactivate) patient */
+
+/**
+ * Désactiver un patient sans toucher au dossier médical
+ */
 export async function deletePatient(id) {
   if (!id) throw new Error("Patient id is required");
 
+  // Trouver le patient
   const patient = await prisma.patient.findUnique({
     where: { id: Number(id) },
     include: { user: true },
   });
+
   if (!patient) throw new Error("Patient not found");
 
+  // Désactiver l'utilisateur
   await prisma.user.update({
     where: { id: patient.userId },
-    data: { role: "PATIENT" },
+    data: { isActive: false }, // rendre l'utilisateur inactif
   });
-  await prisma.patient.delete({ where: { id: Number(id) } });
 
-  return { message: "Patient deleted successfully" };
+  // Désactiver le patient
+  await prisma.patient.update({
+    where: { id: patient.id },
+    data: { isActive: false },
+  });
+
+  return { message: "Patient deactivated successfully" };
 }

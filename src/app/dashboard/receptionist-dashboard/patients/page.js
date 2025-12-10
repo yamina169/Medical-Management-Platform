@@ -1,0 +1,131 @@
+"use client"; // nécessaire si on utilise un hook côté client
+import { useState, useEffect } from "react";
+import Link from "next/link";
+
+export default function PatientsPage() {
+  const [patients, setPatients] = useState([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  const fetchPatients = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `/api/patients?search=${encodeURIComponent(
+          search
+        )}&page=${page}&limit=${limit}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
+      if (data.success) {
+        setPatients(data.data);
+        setTotal(data.total);
+      } else {
+        setPatients([]);
+        setTotal(0);
+      }
+    } catch (err) {
+      console.error("Fetch patients error:", err);
+      setPatients([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, [search, page]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Patients</h1>
+        <Link href="/dashboard/receptionist-dashboard/patients/new">
+          <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+            New Patient
+          </button>
+        </Link>
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        <input
+          type="text"
+          placeholder="Search by name, email or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border p-2 rounded w-full max-w-sm"
+        />
+      </div>
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <table className="w-full border-collapse border">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border px-2 py-1">#</th>
+              <th className="border px-2 py-1">Name</th>
+              <th className="border px-2 py-1">Email</th>
+              <th className="border px-2 py-1">Phone</th>
+              <th className="border px-2 py-1">Created At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {patients.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="text-center p-2">
+                  No patients found.
+                </td>
+              </tr>
+            ) : (
+              patients.map((p, index) => (
+                <tr key={p.id}>
+                  <td className="border px-2 py-1">
+                    {index + 1 + (page - 1) * limit}
+                  </td>
+                  <td className="border px-2 py-1">{p.name}</td>
+                  <td className="border px-2 py-1">{p.email}</td>
+                  <td className="border px-2 py-1">{p.phoneNumber}</td>
+                  <td className="border px-2 py-1">
+                    {new Date(p.createdAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span className="px-3 py-1">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

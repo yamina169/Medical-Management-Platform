@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import AdminCard from "@/components/dashboard/AdminCard";
 import StatisticsSuperAdmin from "@/components/dashboard/StatisticsSuperAdmin";
 import ClinicAdminStatics from "@/components/dashboard/ClinicAdminStatics";
+import AppointmentsPage from "@/app/dashboard/doctor-dashboard/appointments/page";
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Récupérer l'utilisateur depuis localStorage
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
@@ -29,11 +29,10 @@ export default function DashboardPage() {
           <AdminCard user={user} />
         </>
       )}
-      {user.role === "ADMIN_CLINIC" && (
-        <>
-          <ClinicAdminStatics user={user} />
-        </>
-      )}
+      {user.role === "ADMIN_CLINIC" && <ClinicAdminStatics user={user} />}
+
+      {user.role === "DOCTOR" && <AppointmentsPage />}
+
       {/* Vous pouvez ajouter d'autres rôles ici si nécessaire */}
     </div>
   );

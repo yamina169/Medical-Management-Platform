@@ -54,6 +54,7 @@ const menus = {
   ],
 
   DOCTOR: [
+    { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
     {
       name: "Patients",
       path: "/dashboard/doctor-dashboard/patients",
@@ -64,6 +65,22 @@ const menus = {
       path: "/dashboard/doctor-dashboard/appointments",
       icon: CalendarDaysIcon,
     },
+    { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
+  ],
+
+  RECEPTIONIST: [
+    { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
+    {
+      name: "Patients",
+      path: "/dashboard/receptionist-dashboard/patients",
+      icon: UserIcon,
+    },
+    {
+      name: "Appointments",
+      path: "/dashboard/receptionist-dashboard/appointments",
+      icon: CalendarDaysIcon,
+    },
+    { name: "Profile", path: "/dashboard/profil", icon: UserIcon },
   ],
 };
 
