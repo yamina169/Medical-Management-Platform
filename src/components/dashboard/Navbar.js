@@ -98,13 +98,31 @@ export default function Navbar() {
   }, []);
 
   // Ajouter 1 notification statique si role DOCTOR
-  const staticDoctorNotifications = user?.role === "DOCTOR" ? [1] : [];
+  // Ajouter 1 notification statique si role DOCTOR ou RECEPTIONIST
+  const staticUserNotifications =
+    user?.role === "DOCTOR"
+      ? [
+          {
+            title: "Bonjour Docteur !",
+            message: "Vérifiez vos rendez-vous d'aujourd'hui.",
+            type: "info",
+          },
+        ]
+      : user?.role === "RECEPTIONIST"
+      ? [
+          {
+            title: "Bonjour Réceptionniste !",
+            message: "Vérifiez les rendez-vous du jour.",
+            type: "info",
+          },
+        ]
+      : [];
 
   const totalNotifications =
     notifications.expired.length +
     notifications.expiring.length +
     (notifications.pendingAdmins?.length || 0) +
-    staticDoctorNotifications.length;
+    staticUserNotifications.length;
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : "U";
   const colors = [
@@ -162,28 +180,31 @@ export default function Navbar() {
 
               <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
                 {/* Notification statique pour DOCTOR */}
-                {(user?.role === "DOCTOR" || user?.role === "RECEPTIONIST") && (
+
+                {/* Notification statique pour DOCTOR ou RECEPTIONIST */}
+                {staticUserNotifications.length > 0 && (
                   <div className="px-4 py-3">
                     <h4 className="text-xs font-semibold text-green-700 uppercase mb-2">
                       Message du jour
                     </h4>
-                    <div className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-green-50 transition flex justify-between items-start gap-2 cursor-pointer">
-                      <div>
-                        <div className="font-medium text-gray-800">
-                          {user?.role === "DOCTOR"
-                            ? "Bonjour Docteur !"
-                            : "Bonjour Réceptionniste !"}
+                    {staticUserNotifications.map((n, idx) => (
+                      <div
+                        key={idx}
+                        className="mb-2 last:mb-0 p-2 rounded-xl hover:bg-green-50 transition flex justify-between items-start gap-2 cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            {n.title}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {n.message}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {user?.role === "DOCTOR"
-                            ? "Vérifiez vos rendez-vous d'aujourd'hui."
-                            : "Vérifiez les rendez-vous du jour."}
-                        </div>
+                        <span className="text-xs font-semibold text-green-700">
+                          Info
+                        </span>
                       </div>
-                      <span className="text-xs font-semibold text-green-700">
-                        Info
-                      </span>
-                    </div>
+                    ))}
                   </div>
                 )}
 

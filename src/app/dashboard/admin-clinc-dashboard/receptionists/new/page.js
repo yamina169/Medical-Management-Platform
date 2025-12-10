@@ -1,85 +1,120 @@
-"use client";
-
+"use client"; // nécessaire pour l'interaction côté client
 import { useState } from "react";
 
-export default function NewReceptionistPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+// Server action
+import { createAppointment } from "@/actions/appointments";
+import { cookies } from "next/headers"; // pour récupérer éventuellement le token
 
-  const handleSubmit = async (e) => {
+export default function NewAppointmentPage() {
+  const [form, setForm] = useState({
+    patientId: "",
+    doctorId: "",
+    date: "",
+    status: "SCHEDULED",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // Fonction appelée au submit
+  async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
-    setError("");
-    setSuccess("");
+    setMessage("");
 
     try {
-      const token = localStorage.getItem("token"); // admin token
-      const res = await fetch("/api/receptionists", {
+      // Récupérer token depuis cookies si nécessaire
+      const token = cookies().get("token")?.value;
+
+      const res = await fetch("/api/appointments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ name, email }), // only name and email
+        body: JSON.stringify(form),
       });
 
       const data = await res.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setName("");
-        setEmail("");
-        setSuccess(
-          "Receptionist created successfully! Password sent via email."
-        );
-        setTimeout(() => setSuccess(""), 2000);
-      }
+      if (!data.success)
+        throw new Error(data.error || "Error creating appointment");
+
+      setMessage("Appointment created successfully!");
+      setForm({
+        patientId: "",
+        doctorId: "",
+        date: "",
+        status: "SCHEDULED",
+      });
     } catch (err) {
-      setError(err.message || "Error creating receptionist");
+      setMessage(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4">New Receptionist</h1>
-
-      {error && <p className="mb-4 text-red-600">{error}</p>}
-      {success && <p className="mb-4 text-green-600">{success}</p>}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="p-6 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">New Appointment</h1>
+      {message && <p className="mb-4 text-red-600">{message}</p>}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block mb-1 font-medium">Name</label>
+          <label className="block mb-1">Patient ID</label>
           <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            type="number"
+            name="patientId"
+            value={form.patientId}
+            onChange={handleChange}
             required
-            className="border p-2 w-full rounded"
+            className="w-full border p-2 rounded"
           />
         </div>
-
         <div>
-          <label className="block mb-1 font-medium">Email</label>
+          <label className="block mb-1">Doctor ID</label>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="number"
+            name="doctorId"
+            value={form.doctorId}
+            onChange={handleChange}
             required
-            className="border p-2 w-full rounded"
+            className="w-full border p-2 rounded"
           />
         </div>
-
+        <div>
+          <label className="block mb-1">Date & Time</label>
+          <input
+            type="datetime-local"
+            name="date"
+            value={form.date}
+            onChange={handleChange}
+            required
+            className="w-full border p-2 rounded"
+          />
+        </div>
+        <div>
+          <label className="block mb-1">Status</label>
+          <select
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+          className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
         >
-          {loading ? "Creating..." : "Create Receptionist"}
+          {loading ? "Creating..." : "Create Appointment"}
         </button>
       </form>
     </div>

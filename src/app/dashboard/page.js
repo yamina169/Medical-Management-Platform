@@ -5,6 +5,8 @@ import AdminCard from "@/components/dashboard/AdminCard";
 import StatisticsSuperAdmin from "@/components/dashboard/StatisticsSuperAdmin";
 import ClinicAdminStatics from "@/components/dashboard/ClinicAdminStatics";
 import AppointmentsPage from "@/app/dashboard/doctor-dashboard/appointments/page";
+import PatientsPage from "@/app/dashboard/receptionist-dashboard/patients/page"; // <-- page pour réceptionniste
+import AppointmentsReceptionistPage from "@/app/dashboard/receptionist-dashboard/appointments/page"; // liste RDV réceptionniste
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
@@ -29,11 +31,19 @@ export default function DashboardPage() {
           <AdminCard user={user} />
         </>
       )}
+
       {user.role === "ADMIN_CLINIC" && <ClinicAdminStatics user={user} />}
 
       {user.role === "DOCTOR" && <AppointmentsPage />}
 
-      {/* Vous pouvez ajouter d'autres rôles ici si nécessaire */}
+      {user.role === "RECEPTIONIST" && (
+        <>
+          {/* Liste des patients */}
+          <PatientsPage />
+
+          {/* Liste des rendez-vous que la réceptionniste peut gérer */}
+        </>
+      )}
     </div>
   );
 }

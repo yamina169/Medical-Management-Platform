@@ -8,8 +8,7 @@ import { sendEmail } from "@/lib/email";
 /**
  * Register a new patient linked to a clinic
  * Crée automatiquement un dossier médical vide pour le patient
- */
-export async function registerPatient(payload, creatorUserId, creatorRole) {
+ */ export async function registerPatient(payload, creatorUserId, creatorRole) {
   if (!creatorUserId) throw new Error("Creator userId is required");
 
   const { name, email, phoneNumber } = payload;
@@ -40,7 +39,11 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
     throw new Error("Unauthorized role to create patient");
   }
 
-  // Générer un mot de passe temporaire
+  // Vérifier si l'email existe déjà
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) throw new Error("Email already exists");
+
+  // Générer mot de passe temporaire
   const tempPassword = crypto.randomBytes(4).toString("hex");
   const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -64,33 +67,17 @@ export async function registerPatient(payload, creatorUserId, creatorRole) {
     include: { clinic: true, user: true },
   });
 
-  // Créer automatiquement le dossier médical
+  // Créer dossier médical
   await prisma.medicalRecord.create({
     data: {
       patientId: patient.id,
       description: "",
       prescriptions: { medicaments: [] },
-      doctorId: null, // peut être assigné plus tard
     },
-  });
-
-  // Envoyer un email avec le mot de passe temporaire
-  await sendEmail({
-    to: email,
-    subject: "Votre compte Patient - MedFlow",
-    text: `Bonjour ${name},\nVotre compte patient a été créé pour la clinique ${patient.clinic.name}.\nEmail: ${email}\nMot de passe temporaire: ${tempPassword}`,
-    html: `<p>Bonjour ${name},</p>
-           <p>Votre compte patient a été créé pour la clinique <strong>${patient.clinic.name}</strong>.</p>
-           <ul>
-             <li><strong>Email:</strong> ${email}</li>
-             <li><strong>Mot de passe temporaire:</strong> ${tempPassword}</li>
-           </ul>
-           <p>Merci, MedFlow</p>`,
   });
 
   return patient;
 }
-
 export async function getPatients(
   tokenJWT,
   { search = "", page = 1, limit = 10 } = {}

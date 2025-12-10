@@ -104,19 +104,27 @@ export async function GET(req) {
 }
 
 // Les autres routes POST, PUT, DELETE peuvent réutiliser verifyUser
+
 export async function POST(req) {
-  const payload = await verifyUser(req);
-  if (payload instanceof NextResponse) return payload;
+  try {
+    const payload = await verifyUser(req);
+    if (payload instanceof NextResponse) return payload;
 
-  const { role, userId } = payload;
-  if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(role))
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { role, userId } = payload;
+    if (!["DOCTOR", "ADMIN_CLINIC", "RECEPTIONIST"].includes(role))
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = await req.json();
-  const patient = await registerPatient(body, userId, role);
-  return NextResponse.json({ success: true, data: patient });
+    const body = await req.json();
+    const patient = await registerPatient(body, userId, role);
+    return NextResponse.json({ success: true, data: patient });
+  } catch (err) {
+    console.error("Register patient error:", err);
+    return NextResponse.json(
+      { error: err.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
 }
-
 export async function PUT(req) {
   const payload = await verifyUser(req);
   if (payload instanceof NextResponse) return payload;
